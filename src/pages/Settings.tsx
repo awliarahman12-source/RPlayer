@@ -4,7 +4,7 @@ import { useToast } from '@/store/toast';
 import { Timer, Activity, Check } from 'lucide-react';
 import { BackupManager } from '@/components/BackupManager';
 import { BottomSheet } from '@/components/BottomSheet';
-import { StorageManager } from '@/components/StorageManager';
+import { StorageManager } from '@/components/storageManager';
 import { Equalizer } from '@/components/Equalizer';
 
 export function SettingsPage() {
