@@ -130,7 +130,7 @@ export function PlaylistDetailPage() {
             <Clock className="w-6 h-6 text-white/50" />
           </div>
           <p className="text-white/50 text-sm mb-4">{isLiked ? 'Lagu yang kamu sukai akan muncul di sini' : 'Playlist masih kosong'}</p>
-          <UploadButton />
+          <UploadButton playlistId={!isLiked ? playlist?.id : undefined} />
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => {
