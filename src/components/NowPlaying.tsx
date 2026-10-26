@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { getDominantColor } from '@/lib/color';
 import { GuessTheSong } from './GuessTheSong';
 import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, Radio, Gamepad2, Monitor, Smartphone, Cast } from 'lucide-react';
-import { usePresence } from '@/store/presence';
 import { usePlayer } from '@/store/player';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
@@ -14,6 +13,7 @@ import { BottomSheet } from './BottomSheet';
 import { TrackMenuSheet } from './TrackMenuSheet';
 import { Visualizer } from './Visualizer';
 import { LyricsView } from './LyricsView';
+import { usePresence } from '@/store/presence';
 
 interface NowPlayingProps {
   open: boolean;
@@ -36,18 +36,20 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   const playbackRate = usePlayer((s) => s.playbackRate);
   const setPlaybackRate = usePlayer((s) => s.setPlaybackRate);
   const pushToast = useToast((s) => s.push);
-
-  const [queueOpen, setQueueOpen] = useState(false);
-  const [lyricsOpen, setLyricsOpen] = useState(false);
-  const [menuTrack, setMenuTrack] = useState<{ id: string } | null>(null);
-  const [touchStartX, setTouchStartX] = useState(0);
-  const [touchEndX, setTouchEndX] = useState(0);
-  const [lastTap, setLastTap] = useState(0);
-  const [gameOpen, setGameOpen] = useState(false);
+  
+  // --- State Radio & Sync ---
+  const radioMode = usePlayer((s) => s.radioMode);
+  const toggleRadioMode = usePlayer((s) => s.toggleRadioMode);
   const { syncMode, setSyncMode } = usePlayer();
   const devices = usePresence((s) => s.devices);
   const myDeviceId = usePresence((s) => s.deviceId);
   const otherDevices = devices.filter(d => d.deviceId !== myDeviceId);
+
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [lyricsOpen, setLyricsOpen] = useState(false);
+  const [menuTrack, setMenuTrack] = useState<{ id: string } | null>(null);
+  const [lastTap, setLastTap] = useState(0);
+  const [gameOpen, setGameOpen] = useState(false);
 
   // Dynamic Theme
   useEffect(() => {
@@ -123,6 +125,13 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${radioMode ? 'text-accent' : ''}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
               <Radio className="w-3.5 h-3.5" /> Radio
             </button>
+            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${syncMode !== 'off' ? 'text-accent' : ''}`} onClick={() => { 
+              const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
+              setSyncMode(nextMode); 
+              pushToast(`Mode: ${nextMode.toUpperCase()}`); 
+            }}>
+              <Cast className="w-3.5 h-3.5" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
+            </button>
             <button className="tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 text-white" onClick={() => setGameOpen(true)}>
               <Gamepad2 className="w-3.5 h-3.5" /> Game
             </button>
@@ -172,6 +181,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
       <div className="relative z-10 flex-1 flex flex-col px-5 pt-safe pb-6 overflow-y-auto scroll-hidden" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <div className="flex items-center justify-between py-3">
           <button className="tap glass-pill w-10 h-10 flex items-center justify-center text-white" onClick={onClose} aria-label="Tutup"><ChevronDown className="w-5 h-5" /></button>
+          
           <div className="flex flex-col items-center">
             <div className="text-xs uppercase tracking-wider text-white/70 font-semibold">Now Playing</div>
             {otherDevices.length > 0 && (
@@ -184,22 +194,23 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
               </div>
             )}
           </div>
+
           <button className="tap glass-pill w-10 h-10 flex items-center justify-center" onClick={() => toggleLike(track.id)} aria-label="Like">
             <Heart className={`w-5 h-5 ${track.liked ? 'fill-accent text-accent' : 'text-white'}`} />
           </button>
         </div>
 
-      <div className="flex-1 flex flex-col justify-center items-center py-6">
-        <div className={`relative transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'} now-playing-cover`}>
-         <Cover src={track.coverDataUrl} alt={track.title} className="w-full max-w-[340px] aspect-square rounded-glass shadow-2xl z-10 cover-reflection" rounded="xl" onTouchStart={onCoverTouchStart} onTouchEnd={onCoverTouchEnd} />
-         <div className="absolute inset-0 bg-accent/30 blur-3xl -z-10 rounded-full animate-pulse" />
+        <div className="flex-1 flex flex-col justify-center items-center py-6">
+          <div className={`relative transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'} now-playing-cover`}>
+             <Cover src={track.coverDataUrl} alt={track.title} className="w-full max-w-[340px] aspect-square rounded-glass shadow-2xl z-10 cover-reflection" rounded="xl" onTouchStart={onCoverTouchStart} onTouchEnd={onCoverTouchEnd} />
+             <div className="absolute inset-0 bg-accent/30 blur-3xl -z-10 rounded-full animate-pulse" />
+          </div>
+          <div className="w-full max-w-[340px] mt-7 text-center">
+            <h1 className="text-2xl font-bold truncate text-white">{track.title}</h1>
+            <p className="text-white/80 truncate mt-1">{track.artist}</p>
+            {track.album && <p className="text-white/50 truncate mt-0.5 text-sm">{track.album}</p>}
+          </div>
         </div>
-        <div className="w-full max-w-[340px] mt-7 text-center">
-          <h1 className="text-2xl font-bold truncate text-white">{track.title}</h1>
-          <p className="text-white/80 truncate mt-1">{track.artist}</p>
-          {track.album && <p className="text-white/50 truncate mt-0.5 text-sm">{track.album}</p>}
-        </div>
-      </div>
 
         <div className="w-full max-w-[420px] mx-auto">
           <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
@@ -214,14 +225,14 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${playbackRate !== 1 ? 'text-accent' : 'text-white'}`} onClick={() => { const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(nextRate); pushToast(`Kecepatan: ${nextRate}x`); }}>
               <Gauge className="w-4 h-4" /> {playbackRate}x
             </button>
-            <button 
-              className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} 
-              onClick={() => { 
-                const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
-                setSyncMode(nextMode); 
-                pushToast(`Mode: ${nextMode.toUpperCase()}`); 
-              }}
-            >
+            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${radioMode ? 'text-accent' : 'text-white'}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
+              <Radio className="w-4 h-4" /> Radio
+            </button>
+            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => { 
+              const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
+              setSyncMode(nextMode); 
+              pushToast(`Mode: ${nextMode.toUpperCase()}`); 
+            }}>
               <Cast className="w-4 h-4" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
             </button>
             <button className="tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 text-white" onClick={() => setGameOpen(true)}>
