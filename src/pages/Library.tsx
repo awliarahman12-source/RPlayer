@@ -1,260 +1,123 @@
-import { create } from 'zustand';
-import type { Track, Playlist } from '@/types';
-import { usePlayer } from '@/store/player';
-import { useAuth } from '@/store/auth';
-import * as fs from '@/lib/firestore';
-import * as db from '@/lib/db';
-import { useNotification } from '@/store/notification';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Heart, Plus, ArrowUpDown, Library as LibraryIcon, Music } from 'lucide-react';
+import { useLibrary } from '@/store/library';
+import { TrackRow } from '@/components/TrackRow';
+import { UploadButton } from '@/components/Upload';
+import { useToast } from '@/store/toast';
+import { Cover } from '@/components/Cover';
+import { SkeletonRow } from '@/components/Skeleton';
 
-interface LibraryState {
-  tracks: Track[];
-  playlists: Playlist[];
-  loading: boolean;
-  importing: boolean;
-  load: () => Promise<void>;
-  addFiles: (files: File[]) => Promise<void>;
-  removeTrack: (id: string) => Promise<void>;
-  editTrack: (id: string, patch: Partial<Track>) => Promise<void>;
-  toggleLike: (id: string) => Promise<void>;
-  importExternalTrack: (track: Track) => Promise<void>;
-  createPlaylist: (name: string) => Promise<Playlist>;
-  renamePlaylist: (id: string, name: string) => Promise<void>;
-  removePlaylist: (id: string) => Promise<void>;
-  updatePlaylistCover: (id: string, coverDataUrl: string) => Promise<void>;
-  updatePlaylistNotes: (id: string, notes: string) => Promise<void>;
-  movePlaylist: (id: string, parentId: string | null) => Promise<void>;
-  reorderPlaylistTracks: (playlistId: string, newTrackIds: string[]) => Promise<void>;
-  addToPlaylist: (playlistId: string, trackId: string) => Promise<void>;
-  removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
-  likedTracks: () => Track[];
-  recentlyPlayed: () => Track[];
+type SortMode = 'recent' | 'title' | 'artist' | 'duration';
+
+export function LibraryPage() {
+  const tracks = useLibrary((s) => s.tracks);
+  const playlists = useLibrary((s) => s.playlists);
+  const createPlaylist = useLibrary((s) => s.createPlaylist);
+  const loading = useLibrary((s) => s.loading);
+  const pushToast = useToast((s) => s.push);
+  const [sort, setSort] = useState<SortMode>('recent');
+  const [tab, setTab] = useState<'tracks' | 'playlists'>('tracks');
+
+  const sortedTracks = useMemo(() => {
+    const arr = [...tracks];
+    if (sort === 'recent') arr.sort((a, b) => b.addedAt - a.addedAt);
+    else if (sort === 'title') arr.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sort === 'artist') arr.sort((a, b) => a.artist.localeCompare(b.artist));
+    else if (sort === 'duration') arr.sort((a, b) => b.duration - a.duration);
+    return arr;
+  }, [tracks, sort]);
+
+  return (
+    <div className="px-4 lg:px-8 py-6 max-w-[1200px] mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl lg:text-4xl font-bold text-shadow-glass">Library</h1>
+        <UploadButton className="lg:hidden" />
+      </div>
+
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 -mx-4 px-4 py-3 bg-[#0b0b0f]/80 backdrop-blur-md mb-4">
+        <div className="glass-pill p-1 inline-flex mb-3 text-sm">
+          <button className={`px-4 py-1.5 rounded-full tap ${tab === 'tracks' ? 'glass-strong' : 'text-white/60'}`} onClick={() => setTab('tracks')}>Lagu</button>
+          <button className={`px-4 py-1.5 rounded-full tap ${tab === 'playlists' ? 'glass-strong' : 'text-white/60'}`} onClick={() => setTab('playlists')}>Playlist</button>
+        </div>
+      </div>
+
+      {tab === 'tracks' ? (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm text-white/50">{tracks.length} lagu</div>
+            <SortMenu sort={sort} onChange={setSort} />
+          </div>
+
+          {loading ? (
+             <div className="space-y-1">
+               <SkeletonRow />
+               <SkeletonRow />
+               <SkeletonRow />
+             </div>
+          ) : tracks.length === 0 ? (
+            <div className="text-center text-white/40 py-16 flex flex-col items-center">
+              <Music className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-semibold mb-2">Pustaka Kosong</p>
+              <p className="text-sm mb-6">Upload lagu pertamamu buat mulai dengerin musik.</p>
+              <UploadButton />
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {sortedTracks.map((t, i) => (
+                <TrackRow key={t.id} track={t} index={i} contextIds={sortedTracks.map((x) => x.id)} showAlbum />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm text-white/50">{playlists.length + 1} playlist</div>
+            <button className="tap glass-pill px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" onClick={async () => { await createPlaylist('Playlist Baru'); pushToast('Playlist dibuat'); }}>
+              <Plus className="w-3.5 h-3.5" /> Playlist baru
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <Link to="/playlist/liked" className="glass rounded-2xl p-3 flex items-center gap-3 tap specular">
+              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-accent to-emerald-700 flex items-center justify-center">
+                <Heart className="w-6 h-6 fill-white text-white" />
+              </div>
+              <div><div className="font-semibold">Liked Songs</div><div className="text-xs text-white/50">Lagu yang kamu sukai</div></div>
+            </Link>
+            {playlists.map((p) => (
+              <Link key={p.id} to={`/playlist/${p.id}`} className="glass rounded-2xl p-3 flex items-center gap-3 tap specular">
+                <Cover src={p.coverDataUrl} alt={p.name} className="w-14 h-14 shrink-0" rounded="md" />
+                <div className="min-w-0"><div className="font-semibold truncate">{p.name}</div><div className="text-xs text-white/50">{p.trackIds.length} lagu</div></div>
+              </Link>
+            ))}
+            {playlists.length === 0 && <div className="text-center text-white/40 py-10 text-sm">Belum ada playlist. Buat dengan tombol di atas.</div>}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
-export const useLibrary = create<LibraryState>((set, get) => ({
-  tracks: [],
-  playlists: [],
-  loading: true,
-  importing: false,
-
-  load: async () => {
-    const user = useAuth.getState().user;
-    if (!user) return;
-    
-    const [tracks, playlists] = await Promise.all([
-      fs.getTracksFromCloud(user),
-      fs.getPlaylistsFromCloud(user)
-    ]);
-    
-    set({ tracks, playlists, loading: false });
-  },
-
-  addFiles: async (files) => {
-    const user = useAuth.getState().user;
-    if (!user) return;
-
-    const { fileToTrack, isSupportedAudio } = await import('@/lib/metadata');
-    const valid = files.filter(isSupportedAudio);
-    if (!valid.length) return;
-    
-    set({ importing: true });
-    const notify = useNotification.getState();
-
-    try {
-      const newTracks: Track[] = [];
-      for (const file of valid) {
-        try {
-          notify.startUpload(file.name);
-          const track = await fileToTrack(file);
-          
-          const res = await fetch('/api/generate-upload-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: file.name, contentType: file.type || 'audio/mpeg' })
-          });
-          
-          if (!res.ok) throw new Error('Gagal konek ke API Vercel');
-          const { uploadUrl, publicUrl } = await res.json();
-
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', file.type || 'audio/mpeg');
-            
-            xhr.upload.onprogress = (event) => {
-              if (event.lengthComputable) {
-                notify.updateProgress((event.loaded / event.total) * 100);
-              }
-            };
-            
-            xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error('Upload gagal')); };
-            xhr.onerror = () => reject(new Error('Network error'));
-            xhr.send(file);
-          });
-
-          track.audioUrl = publicUrl;
-          await fs.saveTrackToCloud(user, track);
-          newTracks.push(track);
-          notify.endUpload(true);
-        } catch (e) {
-          console.error('Failed to import', file.name, e);
-          notify.endUpload(false);
-        }
-      }
-      
-      if (newTracks.length) {
-        const all = [...newTracks, ...get().tracks].sort((a, b) => b.addedAt - a.addedAt);
-        set({ tracks: all });
-      }
-    } finally {
-      set({ importing: false });
-    }
-  },
-
-  removeTrack: async (id) => {
-    const user = useAuth.getState().user;
-    if (user) await fs.deleteTrackFromCloud(user, id);
-    
-    set((s) => ({
-      tracks: s.tracks.filter((t) => t.id !== id),
-      playlists: s.playlists.map((p) => ({ ...p, trackIds: p.trackIds.filter((t) => t !== id) })),
-    }));
-
-    if (usePlayer.getState().currentTrack?.id === id) {
-      usePlayer.getState().togglePlay();
-      usePlayer.setState({ currentTrack: null, isPlaying: false, position: 0 });
-    }
-  },
-
-  editTrack: async (id, patch) => {
-    const user = useAuth.getState().user;
-    const track = get().tracks.find(t => t.id === id);
-    if (!track || !user) return;
-    
-    const updatedTrack = { ...track, ...patch };
-    await fs.saveTrackToCloud(user, updatedTrack);
-    
-    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? updatedTrack : t)) }));
-    if (usePlayer.getState().currentTrack?.id === id) {
-      usePlayer.setState((state) => ({ currentTrack: updatedTrack }));
-    }
-  },
-
-  toggleLike: async (id) => {
-    const user = useAuth.getState().user;
-    const track = get().tracks.find((t) => t.id === id);
-    if (!track || !user) return;
-    
-    const liked = !track.liked;
-    const likedAt = liked ? Date.now() : undefined;
-    const updated = { ...track, liked, likedAt };
-    
-    await fs.saveTrackToCloud(user, updated);
-    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? updated : t)) }));
-    
-    if (usePlayer.getState().currentTrack?.id === id) {
-      usePlayer.setState({ currentTrack: updated });
-    }
-  },
-
-  importExternalTrack: async (track) => {
-    const user = useAuth.getState().user;
-    if (!user) return;
-    
-    // Ubah statusnya jadi lagu lokal
-    const localTrack = { ...track, isExternal: false };
-    
-    await fs.saveTrackToCloud(user, localTrack);
-    set((s) => ({ tracks: [localTrack, ...s.tracks] }));
-  },
-
-  createPlaylist: async (name) => {
-    const user = useAuth.getState().user;
-    const playlist: Playlist = {
-      id: `pl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      name: name.trim() || 'Playlist Baru',
-      createdAt: Date.now(),
-      trackIds: [],
-      parentId: null,
-    };
-    if (user) await fs.savePlaylistToCloud(user, playlist);
-    set((s) => ({ playlists: [...s.playlists, playlist] }));
-    return playlist;
-  },
-
-  renamePlaylist: async (id, name) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === id);
-    if (!p || !user) return;
-    
-    const updated = { ...p, name: name.trim() || p.name };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
-  },
-
-  removePlaylist: async (id) => {
-    const user = useAuth.getState().user;
-    if (user) await fs.deletePlaylistFromCloud(user, id);
-    set((s) => ({ playlists: s.playlists.filter((x) => x.id !== id) }));
-  },
-
-  updatePlaylistCover: async (id, coverDataUrl) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === id);
-    if (!p || !user) return;
-    const updated = { ...p, coverDataUrl };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
-  },
-
-  updatePlaylistNotes: async (id, description) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === id);
-    if (!p || !user) return;
-    const updated = { ...p, description };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
-  },
-
-  movePlaylist: async (id, parentId) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === id);
-    if (!p || !user) return;
-    
-    const updated = { ...p, parentId };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
-  },
-
-  reorderPlaylistTracks: async (playlistId, newTrackIds) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === playlistId);
-    if (!p || !user) return;
-    
-    const updated = { ...p, trackIds: newTrackIds };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === playlistId ? updated : x)) }));
-  },
-
-  addToPlaylist: async (playlistId, trackId) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === playlistId);
-    if (!p || p.trackIds.includes(trackId) || !user) return;
-    
-    const updated = { ...p, trackIds: [...p.trackIds, trackId] };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === playlistId ? updated : x)) }));
-  },
-
-  removeFromPlaylist: async (playlistId, trackId) => {
-    const user = useAuth.getState().user;
-    const p = get().playlists.find((x) => x.id === playlistId);
-    if (!p || !user) return;
-    
-    const updated = { ...p, trackIds: p.trackIds.filter((t) => t !== trackId) };
-    await fs.savePlaylistToCloud(user, updated);
-    set((s) => ({ playlists: s.playlists.map((x) => (x.id === playlistId ? updated : x)) }));
-  },
-
-  likedTracks: () => get().tracks.filter((t) => t.liked).sort((a, b) => (b.likedAt || 0) - (a.likedAt || 0)),
-  recentlyPlayed: () => get().tracks.filter((t) => t.lastPlayedAt).sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0)).slice(0, 10),
-}));
+function SortMenu({ sort, onChange }: { sort: SortMode; onChange: (m: SortMode) => void }) {
+  const [open, setOpen] = useState(false);
+  const labels: Record<SortMode, string> = { recent: 'Recently added', title: 'Title', artist: 'Artist', duration: 'Duration' };
+  return (
+    <div className="relative">
+      <button className="tap glass-pill px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" onClick={() => setOpen((o) => !o)}>
+        <ArrowUpDown className="w-3.5 h-3.5" /> {labels[sort]}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-20 glass-strong rounded-2xl py-1 min-w-[180px] animate-spring-up">
+          {(Object.keys(labels) as SortMode[]).map((m) => (
+            <button key={m} className={`w-full text-left px-4 py-2 text-sm tap ${sort === m ? 'text-accent' : 'text-white/80'}`} onClick={() => { onChange(m); setOpen(false); }}>
+              {labels[m]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
