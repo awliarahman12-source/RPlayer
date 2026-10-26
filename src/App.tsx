@@ -7,7 +7,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { PlayerBar } from '@/components/PlayerBar';
 import { NowPlaying } from '@/components/NowPlaying';
-import { ToastHost } from '@/components/Toast';
+import { DynamicIsland } from '@/components/DynamicIsland';
 import { HomePage } from '@/pages/Home';
 import { SearchPage } from '@/pages/Search';
 import { LibraryPage } from '@/pages/Library';
@@ -103,7 +103,7 @@ export default function App() {
         <>
           <AmbientBackground />
           <audio ref={audioRef} preload="auto" />
-          <ToastHost />
+          <DynamicIsland />
 
       {/* 1. Kunci tinggi layar utama (h-[100dvh] & overflow-hidden) */}
       <div className="h-[100dvh] overflow-hidden flex">

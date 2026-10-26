@@ -4,6 +4,7 @@ import { usePlayer } from './player';
 import { useAuth } from './auth';
 import * as fs from '@/lib/firestore'; // Firestore Helper
 import * as db from '@/lib/db'; // Masih dipakai buat cache lokal
+import { useNotification } from './notification';
 
 interface LibraryState {
   tracks: Track[];
@@ -54,10 +55,14 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (!valid.length) return;
     
     set({ importing: true });
+    const notify = useNotification.getState();
+
     try {
       const newTracks: Track[] = [];
       for (const file of valid) {
         try {
+          notify.startUpload(file.name); // Munculin Dynamic Island
+          
           const track = await fileToTrack(file);
           
           // 1. Minta Presigned URL ke Vercel API
@@ -66,13 +71,29 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: file.name, contentType: file.type })
           });
+          
+          if (!res.ok) throw new Error('Gagal konek ke API Vercel');
           const { uploadUrl, publicUrl } = await res.json();
 
-          // 2. Upload MP3 langsung ke R2
-          await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': file.type }
+          // 2. Upload MP3 ke R2 pakai XMLHttpRequest (biar progress bar akurat)
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', uploadUrl, true);
+            xhr.setRequestHeader('Content-Type', file.type);
+            
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const percent = (event.loaded / event.total) * 100;
+                notify.updateProgress(percent); // Update progress di Dynamic Island
+              }
+            };
+            
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve();
+              else reject(new Error('Upload ke R2 gagal'));
+            };
+            xhr.onerror = () => reject(new Error('Network error saat upload'));
+            xhr.send(file);
           });
 
           track.audioUrl = publicUrl; // Simpan URL R2
@@ -81,10 +102,14 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           await fs.saveTrackToCloud(user, track);
           newTracks.push(track);
           
+          notify.endUpload(true); // Sukses
+          
         } catch (e) {
-          console.warn('Failed to import', file.name, e);
+          console.error('Failed to import', file.name, e);
+          notify.endUpload(false); // Gagal
         }
       }
+      
       if (newTracks.length) {
         const all = [...newTracks, ...get().tracks].sort((a, b) => b.addedAt - a.addedAt);
         set({ tracks: all });
