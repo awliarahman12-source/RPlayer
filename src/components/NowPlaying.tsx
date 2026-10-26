@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDominantColor } from '@/lib/color';
 import { GuessTheSong } from './GuessTheSong';
-import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, AudioLines } from 'lucide-react';
+import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, Radio, Gamepad2 } from 'lucide-react';
 import { usePlayer } from '@/store/player';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
@@ -54,11 +54,6 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
       });
     }
   }, [track?.coverDataUrl]);
-
-  // Shake to Shuffle
-  useShake(() => {
-    if (isPlaying) usePlayer.getState().next();
-  });
 
   const startY = useRef<number | null>(null);
   const startX = useRef<number | null>(null);
@@ -122,6 +117,12 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${playbackRate !== 1 ? 'text-accent' : ''}`} onClick={() => { const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(nextRate); pushToast(`Kecepatan: ${nextRate}x`); }}>
               <Gauge className="w-3.5 h-3.5" /> {playbackRate}x
             </button>
+            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${radioMode ? 'text-accent' : ''}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
+              <Radio className="w-3.5 h-3.5" /> Radio
+            </button>
+            <button className="tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 text-white" onClick={() => setGameOpen(true)}>
+              <Gamepad2 className="w-3.5 h-3.5" /> Game
+            </button>
           </div>
         </div>
         
@@ -150,6 +151,8 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
         <BottomSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} title="Lirik Lagu">
           <LyricsView trackId={track.id} />
         </BottomSheet>
+
+        {gameOpen && <GuessTheSong onClose={() => setGameOpen(false)} />}
       </aside>
     );
   }
@@ -187,7 +190,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
         <div className="w-full max-w-[420px] mx-auto">
           <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
           <div className="mt-6"><PlayerControls size="lg" /></div>
-          <div className="flex items-center justify-center gap-3 mt-6">
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
             <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${lyricsOpen ? 'text-accent' : 'text-white'}`} onClick={() => setLyricsOpen(true)}>
               <Mic2 className="w-4 h-4" /> Lirik
             </button>
