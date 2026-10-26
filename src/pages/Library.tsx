@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Track, Playlist } from '@/types';
-import { usePlayer } from './player';
+import { usePlayer } from '@/store/player';
 import { useAuth } from './auth';
 import * as fs from '@/lib/firestore';
 import * as db from '@/lib/db';
