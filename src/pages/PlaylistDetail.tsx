@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image, FileText } from 'lucide-react';
+import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image, FileText, Share2 } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
@@ -161,7 +161,17 @@ export function PlaylistDetailPage() {
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={name}>
         <div className="space-y-1">
-          <SheetItem icon={<Pencil className="w-5 h-5" />} label="Ganti nama" onClick={() => { setNameInput(name); setRenaming(true); setMenuOpen(false); }} />
+          <SheetItem 
+            icon={<Share2 className="w-5 h-5" />} 
+            label="Share Playlist" 
+            onClick={() => { 
+              const username = useAuth.getState().user;
+              const link = `${window.location.origin}/#/share/${username}/${playlist?.id}`;
+              navigator.clipboard.writeText(link);
+              pushToast('Link Share berhasil di-copy!');
+              setMenuOpen(false); 
+            }} 
+          />
           <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
           <SheetItem icon={<FileText className="w-5 h-5" />} label="Edit Notes" onClick={() => { 
             const notes = prompt("Tulis catatan buat playlist ini:", playlist?.description || '');

@@ -336,7 +336,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         await updateAmbient(track, set);
         if (audioEl) {
           // Pakai URL dari R2, kalau nggak ada baru fallback ke lokal
-          let url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+          const localUrl = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+          let url = localUrl || track.audioUrl;
 
           // Trik buat ngubah URL lama r2.dev ke URL Worker
           if (url && url.includes('.r2.dev')) {
@@ -366,8 +367,9 @@ async function loadAndPlay(track: Track, set: any, get: any) {
   set({ currentTrack: track, position: 0, duration: track.duration || 0, error: null });
   if (!audioEl) return;
   try {
-    // Pakai URL dari R2, kalau nggak ada baru fallback ke lokal     
-    let url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    // Cek IndexedDB dulu (kalau udah di-download), baru fallback ke URL internet
+    const localUrl = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    let url = localUrl || track.audioUrl;
 
     // Trik buat ngubah URL lama r2.dev ke URL Worker
     if (url && url.includes('.r2.dev')) {

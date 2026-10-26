@@ -19,6 +19,7 @@ import { usePlayer } from '@/store/player';
 import { getSettingsFromCloud } from '@/lib/firestore';
 import { useAuth } from '@/store/auth';
 import { LoginPage } from '@/pages/Login';
+import { PartyGuestPage } from '@/pages/PartyGuest';
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -92,6 +93,27 @@ export default function App() {
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
+
+  // CEK: Kalau URL-nya buat share playlist, tampilin halaman publik tanpa login
+  if (window.location.hash.startsWith('#/share/')) {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="/share/:username/:playlistId" element={<SharedPlaylistPage />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
+
+  if (window.location.hash.startsWith('#/party/')) {
+    return (
+      <HashRouter>
+        <Routes>
+          <Route path="/party/:roomCode" element={<PartyGuestPage />} />
+        </Routes>
+      </HashRouter>
+    );
+  }
 
   return (
     <HashRouter>

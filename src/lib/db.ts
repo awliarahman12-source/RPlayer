@@ -132,3 +132,8 @@ export async function clearAllData() {
   await db.clear('playlists');
   await db.clear('settings');
 }
+
+export async function saveAudioBlob(id: string, blob: Blob) {
+  const db = await getDB();
+  await db.put('audio', { id, blob });
+}

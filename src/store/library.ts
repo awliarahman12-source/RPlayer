@@ -27,6 +27,8 @@ interface LibraryState {
   removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
   likedTracks: () => Track[];
   recentlyPlayed: () => Track[];
+  importExternalTrack: (track: Track) => Promise<void>;
+  downloadTrack: (id: string) => Promise<void>;
 }
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -66,7 +68,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           
           const track = await fileToTrack(file);
           
-          // 1. Minta Presigned URL ke Vercel API
           const res = await fetch('/api/generate-upload-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -76,7 +77,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           if (!res.ok) throw new Error('Gagal konek ke API Vercel');
           const { uploadUrl, publicUrl } = await res.json();
 
-          // 2. Upload MP3 ke R2 (TANPA HEADER CONTENT-TYPE BIAR LOLOS CORS)
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl, true);
@@ -84,8 +84,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {
-                const percent = (event.loaded / event.total) * 100;
-                notify.updateProgress(percent);
+                notify.updateProgress((event.loaded / event.total) * 100);
               }
             };
             
@@ -99,7 +98,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
           track.audioUrl = publicUrl;
           
-          // 3. Simpan ke Firestore
           await fs.saveTrackToCloud(user, track);
           newTracks.push(track);
           
@@ -163,6 +161,41 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     
     if (usePlayer.getState().currentTrack?.id === id) {
       usePlayer.setState({ currentTrack: updated });
+    }
+  },
+
+  importExternalTrack: async (track) => {
+    const user = useAuth.getState().user;
+    if (!user) return;
+    
+    const localTrack = { ...track, isExternal: false };
+    await fs.saveTrackToCloud(user, localTrack);
+    set((s) => ({ tracks: [localTrack, ...s.tracks] }));
+  },
+
+  downloadTrack: async (id) => {
+    const track = get().tracks.find((t) => t.id === id);
+    if (!track || !track.audioUrl) return;
+    const user = useAuth.getState().user;
+    if (!user) return;
+    
+    try {
+      // Fetch file dari R2/Jamendo
+      const res = await fetch(track.audioUrl);
+      const blob = await res.blob();
+      
+      // Simpan ke IndexedDB lokal
+      await db.saveAudioBlob(track.id, blob);
+      
+      // Update status di state & database
+      const updated = { ...track, isDownloaded: true };
+      await fs.saveTrackToCloud(user, updated);
+      set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? updated : t)) }));
+      
+      useNotification.getState().show('Lagu berhasil di-download', 'success');
+    } catch (e) {
+      console.error(e);
+      useNotification.getState().show('Gagal download lagu', 'error');
     }
   },
 

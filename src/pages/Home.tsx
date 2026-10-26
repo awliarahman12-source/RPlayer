@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Play, Settings } from 'lucide-react';
+import { Heart, Play, Settings, Users } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { greeting } from '@/lib/format';
 import { TrackCard, PlaylistCard } from '@/components/Cards';
 import { Dropzone } from '@/components/Upload';
 import { Cover } from '@/components/Cover';
+import { useParty } from '@/store/party';
+import { PartyHostPanel } from '@/components/PartyHostPanel';
 
 export function HomePage() {
   const tracks = useLibrary((s) => s.tracks);
@@ -14,6 +16,9 @@ export function HomePage() {
   const likedTracks = useLibrary((s) => s.likedTracks)();
   const recentlyPlayed = useLibrary((s) => s.recentlyPlayed)();
   const playTracks = usePlayer((s) => s.playTracks);
+  
+  const { room, startParty } = useParty();
+  const [showPartyPanel, setShowPartyPanel] = useState(false);
 
   const recent = useMemo(() => [...tracks].sort((a, b) => b.addedAt - a.addedAt).slice(0, 12), [tracks]);
 
@@ -22,11 +27,26 @@ export function HomePage() {
       <div className="px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-shadow-glass">{greeting()}</h1>
-          <Link to="/settings" className="tap glass-pill w-10 h-10 flex items-center justify-center text-white">
-            <Settings className="w-5 h-5" />
-          </Link>
+          <div className="flex gap-2">
+            {room ? (
+              <button className="tap glass-pill px-3 h-10 flex items-center justify-center text-accent text-xs font-medium gap-2 bg-accent/10 border-accent/30" onClick={() => setShowPartyPanel(true)}>
+                <Users className="w-4 h-4" /> Kelola Party
+              </button>
+            ) : (
+              <button className="tap glass-pill px-3 h-10 flex items-center justify-center text-white text-xs font-medium gap-2" onClick={async () => {
+                const code = await startParty();
+                if (code) setShowPartyPanel(true);
+              }}>
+                <Users className="w-4 h-4" /> Start Party
+              </button>
+            )}
+            <Link to="/settings" className="tap glass-pill w-10 h-10 flex items-center justify-center text-white">
+              <Settings className="w-5 h-5" />
+            </Link>
+          </div>
         </div>
         <Dropzone />
+        {showPartyPanel && <PartyHostPanel onClose={() => setShowPartyPanel(false)} />}
       </div>
     );
   }
@@ -35,13 +55,26 @@ export function HomePage() {
     <div className="px-4 lg:px-8 py-6 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl lg:text-4xl font-bold text-shadow-glass">{greeting()}</h1>
-        <Link to="/settings" className="tap glass-pill w-10 h-10 flex items-center justify-center text-white">
-          <Settings className="w-5 h-5" />
-        </Link>
+        <div className="flex gap-2">
+          {room ? (
+            <button className="tap glass-pill px-3 h-10 flex items-center justify-center text-accent text-xs font-medium gap-2 bg-accent/10 border-accent/30" onClick={() => setShowPartyPanel(true)}>
+              <Users className="w-4 h-4" /> Kelola Party
+            </button>
+          ) : (
+            <button className="tap glass-pill px-3 h-10 flex items-center justify-center text-white text-xs font-medium gap-2" onClick={async () => {
+              const code = await startParty();
+              if (code) setShowPartyPanel(true);
+            }}>
+              <Users className="w-4 h-4" /> Start Party
+            </button>
+          )}
+          <Link to="/settings" className="tap glass-pill w-10 h-10 flex items-center justify-center text-white">
+            <Settings className="w-5 h-5" />
+          </Link>
+        </div>
       </div>
 
       <section className="mb-8">
-        {/* Bikin max-w-3xl biar kartu atas nggak melar ke samping di desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-4xl">
           <Link
             to="/playlist/liked"
@@ -106,6 +139,8 @@ export function HomePage() {
           </div>
         </Section>
       )}
+
+      {showPartyPanel && <PartyHostPanel onClose={() => setShowPartyPanel(false)} />}
     </div>
   );
 }

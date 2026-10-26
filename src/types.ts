@@ -12,12 +12,12 @@ export interface Track {
   lastPlayedAt?: number;
   liked: boolean;
   likedAt?: number;
-  audioUrl?: string;
+  audioUrl?: string; // URL MP3 dari R2 (Cuma butuh satu)
   playCount?: number;
+  isDownloaded?: boolean; 
   genre?: string;
   notes?: string;
   isExternal?: boolean;
-  audioUrl?: string; // URL MP3 dari R2
 }
 
 export interface Playlist {
@@ -26,9 +26,23 @@ export interface Playlist {
   createdAt: number;
   trackIds: string[];
   coverDataUrl?: string;
-  parentId?: string | null;
+  parentId?: string | null; // Cuma butuh satu
   description?: string;
-  parentId?: string | null;
+}
+
+export interface PartyQueueItem {
+  trackId: string;
+  requestedBy: string;
+  addedAt: number;
+  votes?: number; // <-- Tambahan buat Voting
+}
+
+export interface PartyRoom {
+  host: string;
+  roomCode: string;
+  queue: PartyQueueItem[];
+  createdAt: number;
+  isActive: boolean;
 }
 
 export type RepeatMode = 'off' | 'all' | 'one';

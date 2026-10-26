@@ -22,6 +22,7 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
   const removeTrack = useLibrary((s) => s.removeTrack);
+  const downloadTrack = useLibrary((s) => s.downloadTrack);
   const playNext = usePlayer((s) => s.playNext);
   const addToQueue = usePlayer((s) => s.addToQueue);
   const pushToast = useToast((s) => s.push);
@@ -81,6 +82,19 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
               label="Edit Info" 
               onClick={() => { onClose(); setEditOpen(true); }} 
             />
+
+            {!track.isDownloaded && (
+              <SheetItem 
+                icon={<Download className="w-5 h-5" />} 
+                label="Download untuk Offline" 
+                onClick={() => { void downloadTrack(track.id); toast('Memulai download...'); onClose(); }} 
+              />
+            )}
+            {track.isDownloaded && (
+              <div className="px-4 py-3 text-sm text-green-400 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5" /> Tersedia Offline
+              </div>
+            )}
 
             <div className="h-px bg-white/10 my-1" />
             <SheetItem icon={<Trash2 className="w-5 h-5" />} label="Hapus lagu" danger onClick={() => { void removeTrack(track.id); toast('Lagu dihapus'); onClose(); }} />
