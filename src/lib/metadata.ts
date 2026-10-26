@@ -43,10 +43,23 @@ function downscaleCover(dataUrl: string, maxSize = 512): Promise<string> {
 
 export async function fileToTrack(file: File): Promise<Track> {
   const id = uid();
+
+  // 1. Ambil nama file tanpa ekstensi sebagai cadangan (fallback)
+  const rawName = file.name.replace(/\.[^.]+$/, '');
+  let parsedTitle = rawName;
+  let parsedArtist = 'Unknown artist';
+
+  // Trik: Kalau nama file ada strip " - ", pecah jadi Artis dan Judul
+  if (rawName.includes(' - ')) {
+    const parts = rawName.split(' - ');
+    parsedArtist = parts[0].trim();
+    parsedTitle = parts.slice(1).join(' - ').trim();
+  }
+
   const base: Track = {
     id,
-    title: file.name.replace(/\.[^.]+$/, ''),
-    artist: 'Unknown artist',
+    title: parsedTitle,
+    artist: parsedArtist,
     album: undefined,
     duration: 0,
     fileName: file.name,
@@ -57,21 +70,25 @@ export async function fileToTrack(file: File): Promise<Track> {
   };
 
   try {
+    // 2. Baca Metadata ID3 Asli dari dalam file MP3
     const meta = await parseBlob(file);
     const common = meta.common;
+    
+    // 3. Kalau di dalam file ada info, TIMPA hasil tebakan nama file tadi
     if (common.title) base.title = common.title;
     if (common.artist) base.artist = common.artist;
     if (common.album) base.album = common.album;
     if (meta.format.duration) base.duration = meta.format.duration;
 
+    // 4. Ambil Cover Gambar dari dalam file
     const picture = common.picture?.[0];
     if (picture) {
       const blob = new Blob([picture.data], { type: picture.format });
       const raw = await blobToDataUrl(blob);
-      base.coverDataUrl = await downscaleCover(raw);
+      base.coverDataUrl = await downscaleCover(raw); // Simpan sebagai base64
     }
   } catch {
-    // Fallback to filename-based metadata; duration will be derived on load.
+    // Kalau gagal baca ID3 (file corrupt atau format aneh), biarin pakai fallback nama file
   }
 
   if (!base.duration) {

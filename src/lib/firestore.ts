@@ -36,3 +36,12 @@ export async function getPlaylistsFromCloud(username: string): Promise<Playlist[
 export async function deletePlaylistFromCloud(username: string, playlistId: string) {
   await deleteDoc(doc(db, 'users', username, 'playlists', playlistId));
 }
+
+export async function saveSettingsToCloud(username: string, settings: any) {
+  await setDoc(doc(db, 'users', username, 'settings', 'player'), cleanUndefined(settings));
+}
+
+export async function getSettingsFromCloud(username: string): Promise<any> {
+  const snap = await getDoc(doc(db, 'users', username, 'settings', 'player'));
+  return snap.exists() ? snap.data() : null;
+}

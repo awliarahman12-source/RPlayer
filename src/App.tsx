@@ -16,7 +16,7 @@ import { SettingsPage } from '@/pages/Settings';
 import { ExplorePage } from '@/pages/Explore';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
-import { getSettings } from '@/lib/db';
+import { getSettingsFromCloud } from '@/lib/firestore';
 import { useAuth } from '@/store/auth';
 import { LoginPage } from '@/pages/Login';
 
@@ -63,7 +63,7 @@ export default function App() {
     if (!user || !audioRef.current) return;
     usePlayer.getState()._attach(audioRef.current);
     void load().then(async () => {
-      const settings = await getSettings();
+      const settings = user ? await getSettingsFromCloud(user) : null;
 
       if (settings) await usePlayer.getState()._restore(settings);
     });
@@ -124,8 +124,8 @@ export default function App() {
             className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-28 overflow-y-auto scroll-hidden" 
             style={{
               paddingBottom: hasCurrent
-                ? 'calc(env(safe-area-inset-bottom) + 168px)' 
-                : 'calc(env(safe-area-inset-bottom) + 96px)',  
+                ? 'calc(env(safe-area-inset-bottom) + 200px)' // Ditambahin biar lagu terakhir nggak ketutup
+                : 'calc(env(safe-area-inset-bottom) + 120px)',  
             }}
           >
             <AnimatedRoutes />

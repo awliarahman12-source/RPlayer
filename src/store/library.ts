@@ -16,7 +16,6 @@ interface LibraryState {
   removeTrack: (id: string) => Promise<void>;
   editTrack: (id: string, patch: Partial<Track>) => Promise<void>;
   toggleLike: (id: string) => Promise<void>;
-  importExternalTrack: (track: Track) => Promise<void>;
   createPlaylist: (name: string) => Promise<Playlist>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
   removePlaylist: (id: string) => Promise<void>;
@@ -64,8 +63,10 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       for (const file of valid) {
         try {
           notify.startUpload(file.name);
+          
           const track = await fileToTrack(file);
           
+          // 1. Minta Presigned URL ke Vercel API
           const res = await fetch('/api/generate-upload-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -75,6 +76,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           if (!res.ok) throw new Error('Gagal konek ke API Vercel');
           const { uploadUrl, publicUrl } = await res.json();
 
+          // 2. Upload MP3 ke R2 (TANPA HEADER CONTENT-TYPE BIAR LOLOS CORS)
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl, true);
@@ -82,19 +84,27 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {
-                notify.updateProgress((event.loaded / event.total) * 100);
+                const percent = (event.loaded / event.total) * 100;
+                notify.updateProgress(percent);
               }
             };
             
-            xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error('Upload gagal')); };
-            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve();
+              else reject(new Error('Upload ke R2 gagal'));
+            };
+            xhr.onerror = () => reject(new Error('Network error saat upload'));
             xhr.send(file);
           });
 
           track.audioUrl = publicUrl;
+          
+          // 3. Simpan ke Firestore
           await fs.saveTrackToCloud(user, track);
           newTracks.push(track);
+          
           notify.endUpload(true);
+          
         } catch (e) {
           console.error('Failed to import', file.name, e);
           notify.endUpload(false);
@@ -154,17 +164,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (usePlayer.getState().currentTrack?.id === id) {
       usePlayer.setState({ currentTrack: updated });
     }
-  },
-
-  importExternalTrack: async (track) => {
-    const user = useAuth.getState().user;
-    if (!user) return;
-    
-    // Ubah statusnya jadi lagu lokal
-    const localTrack = { ...track, isExternal: false };
-    
-    await fs.saveTrackToCloud(user, localTrack);
-    set((s) => ({ tracks: [localTrack, ...s.tracks] }));
   },
 
   createPlaylist: async (name) => {

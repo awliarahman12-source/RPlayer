@@ -35,7 +35,7 @@ export function Slider({ value, max, onChange, onCommit, className = '', accentC
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <span className="text-xs tabular-nums text-white/50 w-10 text-right hidden sm:block">
+      <span className="text-xs tabular-nums text-white/50 w-10 text-right block">
         {formatTime(localVal)}
       </span>
       
@@ -76,7 +76,7 @@ export function Slider({ value, max, onChange, onCommit, className = '', accentC
         />
       </div>
 
-      <span className="text-xs tabular-nums text-white/50 w-10 hidden sm:block">
+      <span className="text-xs tabular-nums text-white/50 w-10 block">
         {formatTime(safeMax)}
       </span>
     </div>

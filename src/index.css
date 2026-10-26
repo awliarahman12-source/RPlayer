@@ -315,3 +315,16 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .cover-reflection {
   -webkit-box-reflect: below 8px linear-gradient(transparent, transparent, rgba(0,0,0,0.3));
 }
+
+/* Fix iOS Blank Screen Glitch */
+.glass, .glass-strong, .glass-pill, .glass-pill-strong {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Biar scrollbar nggak motong layout di mobile */
+.scroll-hidden {
+  padding-bottom: 2px;
+}

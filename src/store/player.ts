@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { Track, RepeatMode, PlayerSettings } from '@/types';
 import { useLibrary } from './library';
 import * as db from '@/lib/db';
+import * as fs from '@/lib/firestore';
+import { useAuth } from './auth';
 import { getTrackUrl, getDominantColor } from '@/lib/metadata';
 
 
@@ -423,7 +425,12 @@ function persist(get: () => PlayerState) {
     playbackRate: s.playbackRate,
     volumeBoost: s.volumeBoost,
   };
-  void db.putSettings(settings);
+  
+  // Simpan ke Cloud
+  const user = useAuth.getState().user;
+  if (user) {
+    void fs.saveSettingsToCloud(user, settings);
+  }
 }
 
 function updateMediaSession(get: () => PlayerState) {
