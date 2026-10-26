@@ -19,6 +19,8 @@ interface LibraryState {
   createPlaylist: (name: string) => Promise<Playlist>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
   removePlaylist: (id: string) => Promise<void>;
+  updatePlaylistCover: (id: string, coverDataUrl: string) => Promise<void>;
+  updatePlaylistNotes: (id: string, notes: string) => Promise<void>;
   movePlaylist: (id: string, parentId: string | null) => Promise<void>;
   reorderPlaylistTracks: (playlistId: string, newTrackIds: string[]) => Promise<void>;
   addToPlaylist: (playlistId: string, trackId: string) => Promise<void>;
@@ -192,6 +194,24 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const user = useAuth.getState().user;
     if (user) await fs.deletePlaylistFromCloud(user, id);
     set((s) => ({ playlists: s.playlists.filter((x) => x.id !== id) }));
+  },
+
+  updatePlaylistCover: async (id, coverDataUrl) => {
+    const user = useAuth.getState().user;
+    const p = get().playlists.find((x) => x.id === id);
+    if (!p || !user) return;
+    const updated = { ...p, coverDataUrl };
+    await fs.savePlaylistToCloud(user, updated);
+    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
+  },
+
+  updatePlaylistNotes: async (id, description) => {
+    const user = useAuth.getState().user;
+    const p = get().playlists.find((x) => x.id === id);
+    if (!p || !user) return;
+    const updated = { ...p, description };
+    await fs.savePlaylistToCloud(user, updated);
+    set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
   },
 
   movePlaylist: async (id, parentId) => {

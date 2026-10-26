@@ -13,9 +13,16 @@ const cleanUndefined = <T extends object>(obj: T): T => {
   return newObj;
 };
 
+const cleanUndefined = <T extends object>(obj: T): T => {
+  const newObj = { ...obj };
+  Object.keys(newObj).forEach((key) => {
+    if (newObj[key as keyof T] === undefined) delete newObj[key as keyof T];
+  });
+  return newObj;
+};
+
 export async function saveTrackToCloud(username: string, track: Track) {
-  const cleanTrack = cleanUndefined(track);
-  await setDoc(doc(db, 'users', username, 'tracks', track.id), cleanTrack);
+  await setDoc(doc(db, 'users', username, 'tracks', track.id), cleanUndefined(track));
 }
 
 export async function deleteTrackFromCloud(username: string, trackId: string) {
@@ -28,8 +35,7 @@ export async function getTracksFromCloud(username: string): Promise<Track[]> {
 }
 
 export async function savePlaylistToCloud(username: string, playlist: Playlist) {
-  const cleanPlaylist = cleanUndefined(playlist);
-  await setDoc(doc(db, 'users', username, 'playlists', playlist.id), cleanPlaylist);
+  await setDoc(doc(db, 'users', username, 'playlists', playlist.id), cleanUndefined(playlist));
 }
 
 export async function getPlaylistsFromCloud(username: string): Promise<Playlist[]> {

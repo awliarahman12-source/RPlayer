@@ -29,6 +29,17 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
+  if (track.isExternal) {
+    return (
+      <BottomSheet open={open} onClose={onClose}>
+        <div className="p-6 text-center space-y-4">
+          <p className="text-sm text-white/70">Lagu ini di-streaming langsung dari Jamendo (Creative Commons).</p>
+          <button onClick={onClose} className="w-full glass-pill py-2.5 text-sm tap text-white">Tutup</button>
+        </div>
+      </BottomSheet>
+    );
+  }
+
   return (
     <>
       <BottomSheet open={open} onClose={onClose}>

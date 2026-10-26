@@ -23,8 +23,10 @@ interface PlayerState {
   crossfade: boolean;
   playbackRate: number;
   volumeBoost: number;
+  radioMode: boolean;
   
   setSleepTimer: (minutes: number | null) => void;
+  toggleRadioMode: () => void;
   toggleCrossfade: () => void;
   setPlaybackRate: (rate: number) => void;
   setVolumeBoost: (boost: number) => void;
@@ -85,6 +87,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   crossfade: false,
   playbackRate: 1,
   volumeBoost: 1,
+  radioMode: false,
 
   playTrack: async (trackId, contextIds) => {
     const lib = useLibrary.getState();
@@ -167,6 +170,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         audioEl.currentTime = 0;
         void audioEl.play().catch(() => {});
       }
+    } else if (get().radioMode && currentTrack) {
+      const allTracks = useLibrary.getState().tracks;
+      const similar = allTracks.filter(t => t.id !== currentTrack.id && (t.artist === currentTrack.artist || t.genre === currentTrack.genre));
+      const nextTrack = similar.length > 0 ? similar[Math.floor(Math.random() * similar.length)] : allTracks[Math.floor(Math.random() * allTracks.length)];
+      if (nextTrack) {
+        set({ queue: [] });
+        await loadAndPlay(nextTrack, set, get);
+      }
     } else {
       set({ isPlaying: false });
     }
@@ -220,6 +231,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   addToQueue: (trackId) => set((s) => ({ queue: [...s.queue, trackId] })),
   removeFromQueue: (index) => set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })),
   clearQueue: () => set({ queue: [] }),
+
+  toggleRadioMode: () => {
+    set((s) => ({ radioMode: !s.radioMode }));
+    persist(get);
+  },
 
   setSleepTimer: (minutes) => {
     const end = minutes ? Date.now() + minutes * 60 * 1000 : null;
@@ -372,7 +388,7 @@ async function loadAndPlay(track: Track, set: any, get: any) {
       if (e?.name !== 'AbortError') console.warn('play() rejected', e);
     });
     void updateAmbient(track, set);
-    void db.updateTrack(track.id, { lastPlayedAt: Date.now() });
+    void db.updateTrack(track.id, { lastPlayedAt: Date.now(), playCount: (track.playCount || 0) + 1 });
     useLibrary.setState((s) => ({
       tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, lastPlayedAt: Date.now() } : t)),
     }));

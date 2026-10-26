@@ -13,6 +13,7 @@ import { SearchPage } from '@/pages/Search';
 import { LibraryPage } from '@/pages/Library';
 import { PlaylistDetailPage } from '@/pages/PlaylistDetail';
 import { SettingsPage } from '@/pages/Settings';
+import { ExplorePage } from '@/pages/Explore';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { getSettings } from '@/lib/db';
@@ -37,6 +38,7 @@ function AnimatedRoutes() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/playlist/:id" element={<PlaylistDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/explore" element={<ExplorePage />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

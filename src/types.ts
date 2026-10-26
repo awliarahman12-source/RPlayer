@@ -12,6 +12,11 @@ export interface Track {
   lastPlayedAt?: number;
   liked: boolean;
   likedAt?: number;
+  audioUrl?: string;
+  playCount?: number;
+  genre?: string;
+  notes?: string;
+  isExternal?: boolean;
   audioUrl?: string; // URL MP3 dari R2
 }
 
@@ -21,6 +26,8 @@ export interface Playlist {
   createdAt: number;
   trackIds: string[];
   coverDataUrl?: string;
+  parentId?: string | null;
+  description?: string;
   parentId?: string | null;
 }
 

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Library, Plus, Heart, ListMusic, Trash2 } from 'lucide-react';
+import { Home, Search, Library, Plus, Heart, ListMusic, Trash2, Compass } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
 import { UploadButton } from './Upload';
@@ -20,6 +20,7 @@ export function Sidebar() {
         <nav className="flex flex-col gap-1">
           <NavItem to="/" icon={<Home className="w-5 h-5" />} label="Home" end />
           <NavItem to="/search" icon={<Search className="w-5 h-5" />} label="Search" />
+          <NavItem to="/explore" icon={<Compass className="w-5 h-5" />} label="Explore" />
           <NavItem to="/library" icon={<Library className="w-5 h-5" />} label="Library" />
         </nav>
       </div>

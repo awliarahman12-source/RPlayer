@@ -90,6 +90,7 @@ export function PlaylistDetailPage() {
             <h1 className="text-3xl sm:text-5xl font-bold truncate text-shadow-glass">{name}</h1>
           )}
           <div className="text-sm text-white/50 mt-2">{playlistTracks.length} lagu · {formatDuration(totalDuration)}</div>
+          {playlist?.description && <p className="text-sm text-white/40 italic mt-1">"{playlist.description}"</p>}
         </div>
       </div>
 
@@ -159,7 +160,14 @@ export function PlaylistDetailPage() {
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={name}>
         <div className="space-y-1">
-          <SheetItem icon={<Pencil className="w-5 h-5" />} label="Ganti nama" onClick={() => { setNameInput(name); setRenaming(true); setMenuOpen(false); }} />
+          <div className="text-sm text-white/50 mt-2">{playlistTracks.length} lagu · {formatDuration(totalDuration)}</div>
+          {playlist?.description && <p className="text-sm text-white/40 italic mt-1">"{playlist.description}"</p>}
+          <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
+          <SheetItem icon={<FileText className="w-5 h-5" />} label="Edit Notes" onClick={() => { 
+            const notes = prompt("Tulis catatan buat playlist ini:", playlist?.description || '');
+            if (notes !== null && playlist) updatePlaylistNotes(playlist.id, notes);
+            setMenuOpen(false);
+          }} />
           <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
           <SheetItem icon={<Plus className="w-5 h-5" />} label="Tambah lagu" onClick={() => { setMenuOpen(false); navigate('/library'); pushToast('Cari lagu lalu pakai menu "Tambahkan ke playlist"'); }} />
           <div className="h-px bg-white/10 my-1" />
