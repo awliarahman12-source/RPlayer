@@ -17,6 +17,7 @@ interface Props {
 
 export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
   const toggleLike = useLibrary((s) => s.toggleLike);
+  const importExternalTrack = useLibrary((s) => s.importExternalTrack);
   const playlists = useLibrary((s) => s.playlists);
   const createPlaylist = useLibrary((s) => s.createPlaylist);
   const addToPlaylist = useLibrary((s) => s.addToPlaylist);
@@ -32,9 +33,25 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
   if (track.isExternal) {
     return (
       <BottomSheet open={open} onClose={onClose}>
-        <div className="p-6 text-center space-y-4">
-          <p className="text-sm text-white/70">Lagu ini di-streaming langsung dari Jamendo (Creative Commons).</p>
-          <button onClick={onClose} className="w-full glass-pill py-2.5 text-sm tap text-white">Tutup</button>
+        <div className="flex items-center gap-3 px-3 py-2 mb-1">
+          <Cover src={track.coverDataUrl} alt={track.title} className="w-14 h-14" rounded="md" />
+          <div className="min-w-0">
+            <div className="truncate font-semibold">{track.title}</div>
+            <div className="truncate text-sm text-white/50">{track.artist}</div>
+          </div>
+        </div>
+        <div className="h-px bg-white/10 my-2" />
+        
+        <div className="space-y-1">
+          <SheetItem 
+            icon={<Plus className="w-5 h-5" />} 
+            label="Simpan ke Library" 
+            onClick={async () => { 
+              await importExternalTrack(track); 
+              toast('Lagu berhasil disimpan ke Library'); 
+              onClose(); 
+            }} 
+          />
         </div>
       </BottomSheet>
     );
@@ -59,7 +76,6 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
             <SheetItem icon={<Heart className={`w-5 h-5 ${track.liked ? 'fill-accent text-accent' : ''}`} />} label={track.liked ? 'Hapus dari Liked Songs' : 'Tambahkan ke Liked Songs'} onClick={() => { void toggleLike(track.id); toast(track.liked ? 'Dihapus dari Liked' : 'Ditambahkan ke Liked'); onClose(); }} />
             <SheetItem icon={<Plus className="w-5 h-5" />} label="Tambahkan ke playlist" onClick={() => setPickerOpen(true)} />
             
-            {/* TOMBOL EDIT INFO BARU */}
             <SheetItem 
               icon={<Pencil className="w-5 h-5" />} 
               label="Edit Info" 
@@ -90,7 +106,6 @@ export function TrackMenuSheet({ open, onClose, track, onToast }: Props) {
         )}
       </BottomSheet>
 
-      {/* MODAL EDIT */}
       {editOpen && <EditTrackModal track={track} onClose={() => setEditOpen(false)} />}
     </>
   );
