@@ -37,10 +37,10 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   const setPlaybackRate = usePlayer((s) => s.setPlaybackRate);
   const pushToast = useToast((s) => s.push);
   
-  // --- State Radio & Sync ---
   const radioMode = usePlayer((s) => s.radioMode);
   const toggleRadioMode = usePlayer((s) => s.toggleRadioMode);
-  const { syncMode, setSyncMode } = usePlayer();
+  const syncMode = usePlayer((s) => s.syncMode);
+  const setSyncMode = usePlayer((s) => s.setSyncMode);
   const devices = usePresence((s) => s.devices);
   const myDeviceId = usePresence((s) => s.deviceId);
   const otherDevices = devices.filter(d => d.deviceId !== myDeviceId);
@@ -52,7 +52,6 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   const [gameOpen, setGameOpen] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
 
-  // Dynamic Theme
   useEffect(() => {
     if (track?.coverDataUrl) {
       getDominantColor(track.coverDataUrl).then((color) => {
@@ -126,12 +125,8 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${radioMode ? 'text-accent' : ''}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
               <Radio className="w-3.5 h-3.5" /> Radio
             </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${syncMode !== 'off' ? 'text-accent' : ''}`} onClick={() => { 
-              const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
-              setSyncMode(nextMode); 
-              pushToast(`Mode: ${nextMode.toUpperCase()}`); 
-            }}>
-              <Cast className="w-3.5 h-3.5" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
+            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${syncMode ? 'text-accent' : ''}`} onClick={() => setSyncMenuOpen(true)}>
+              <Cast className="w-3.5 h-3.5" /> {!syncMode ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'speaker' ? 'Speaker' : 'Remote'}
             </button>
             <button className="tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 text-white" onClick={() => setGameOpen(true)}>
               <Gamepad2 className="w-3.5 h-3.5" /> Game
@@ -159,13 +154,31 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             )}
           </div>
         )}
-        {menuTrack && <TrackMenuSheet open={!!menuTrack} onClose={() => setMenuTrack(null)} track={tracks.find((t) => t.id === menuTrack.id)!} />}
+        {menuTrack && <TrackMenuSheet open={!!menuTrack} onClose={() => setTrackMenuOpen(null)} track={tracks.find((t) => t.id === menuTrack.id)!} />}
         
         <BottomSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} title="Lirik Lagu">
           <LyricsView trackId={track.id} />
         </BottomSheet>
 
         {gameOpen && <GuessTheSong onClose={() => setGameOpen(false)} />}
+
+        {/* TAMBAHAN: BottomSheet Sync untuk Desktop */}
+        <BottomSheet open={syncMenuOpen} onClose={() => setSyncMenuOpen(false)} title="Pilih Mode Sync">
+          <div className="space-y-1 pb-4">
+            <button onClick={() => { setSyncMode('host'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'host' ? 'text-accent font-bold' : 'text-white'}`}>
+              <div className="font-bold">Host</div>
+              <div className="text-xs text-white/50">Putar lagu & kontrol dari device ini</div>
+            </button>
+            <button onClick={() => { setSyncMode('remote'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'remote' ? 'text-accent font-bold' : 'text-white'}`}>
+              <div className="font-bold">Remote</div>
+              <div className="text-xs text-white/50">Bisu, tapi bisa kontrol Host</div>
+            </button>
+            <button onClick={() => { setSyncMode('speaker'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'speaker' ? 'text-accent font-bold' : 'text-white'}`}>
+              <div className="font-bold">Speaker</div>
+              <div className="text-xs text-white/50">Ngeluarin suara, ngikutin Host</div>
+            </button>
+          </div>
+        </BottomSheet>
       </aside>
     );
   }
@@ -229,8 +242,8 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${radioMode ? 'text-accent' : 'text-white'}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
               <Radio className="w-4 h-4" /> Radio
             </button>
-            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => setSyncMenuOpen(true)}>
-              <Cast className="w-4 h-4" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
+            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => setSyncMenuOpen(true)}>
+              <Cast className="w-4 h-4" /> {!syncMode ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'speaker' ? 'Speaker' : 'Remote'}
             </button>
             <button className="tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 text-white" onClick={() => setGameOpen(true)}>
               <Gamepad2 className="w-4 h-4" /> Game
@@ -267,17 +280,17 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
 
       <BottomSheet open={syncMenuOpen} onClose={() => setSyncMenuOpen(false)} title="Pilih Mode Sync">
         <div className="space-y-1 pb-4">
-          <button onClick={() => { setSyncMode('off'); setSyncMenuOpen(false); pushToast('Sync Dimatikan'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'off' ? 'text-accent font-bold' : 'text-white'}`}>
-            Off (Hanya Device Ini)
+          <button onClick={() => { setSyncMode('host'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'host' ? 'text-accent font-bold' : 'text-white'}`}>
+            <div className="font-bold">Host</div>
+            <div className="text-xs text-white/50">Putar lagu & kontrol dari device ini</div>
           </button>
-          <button onClick={() => { setSyncMode('host'); setSyncMenuOpen(false); pushToast('Mode Host Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'host' ? 'text-accent font-bold' : 'text-white'}`}>
-            Host (Putar & Kontrol)
+          <button onClick={() => { setSyncMode('remote'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'remote' ? 'text-accent font-bold' : 'text-white'}`}>
+            <div className="font-bold">Remote</div>
+            <div className="text-xs text-white/50">Bisu, tapi bisa kontrol Host</div>
           </button>
-          <button onClick={() => { setSyncMode('receiver'); setSyncMenuOpen(false); pushToast('Mode Speaker Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'receiver' ? 'text-accent font-bold' : 'text-white'}`}>
-            Speaker (Putar Bareng Host)
-          </button>
-          <button onClick={() => { setSyncMode('remote'); setSyncMenuOpen(false); pushToast('Mode Remote Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'remote' ? 'text-accent font-bold' : 'text-white'}`}>
-            Remote (Hanya Kontrol, Bisu)
+          <button onClick={() => { setSyncMode('speaker'); setSyncMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'speaker' ? 'text-accent font-bold' : 'text-white'}`}>
+            <div className="font-bold">Speaker</div>
+            <div className="text-xs text-white/50">Ngeluarin suara, ngikutin Host</div>
           </button>
         </div>
       </BottomSheet>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Track, RepeatMode, PlayerSettings, SyncPlaybackState } from '@/types';
+import type { Track, RepeatMode, PlayerSettings, SyncPlaybackState, SyncMode } from '@/types';
 import { useLibrary } from './library';
 import * as db from '@/lib/db';
 import * as fs from '@/lib/firestore';
@@ -26,7 +26,7 @@ interface PlayerState {
   playbackRate: number;
   volumeBoost: number;
   radioMode: boolean;
-  syncMode: 'off' | 'host' | 'remote' | 'receiver';
+  syncMode: SyncMode | null;
   hostId: string | null;
   
   setSleepTimer: (minutes: number | null) => void;
@@ -34,7 +34,7 @@ interface PlayerState {
   toggleCrossfade: () => void;
   setPlaybackRate: (rate: number) => void;
   setVolumeBoost: (boost: number) => void;
-  setSyncMode: (mode: 'off' | 'host' | 'remote' | 'receiver') => void;
+  setSyncMode: (mode: SyncMode) => void;
   playTrack: (trackId: string, contextIds?: string[]) => Promise<void>;
   playTracks: (trackIds: string[], startIndex?: number) => Promise<void>;
   togglePlay: () => void;
@@ -59,6 +59,8 @@ interface PlayerState {
 }
 
 let audioEl: HTMLAudioElement | null = null;
+let speakerSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+const SYNC_DELAY_MS = 300;
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -88,18 +90,25 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   playbackRate: 1,
   volumeBoost: 1,
   radioMode: false,
-  syncMode: 'off',
+  syncMode: null,
   hostId: null,
 
   setSyncMode: (mode) => {
+    if (!mode) return;
     const deviceId = usePresence.getState().deviceId;
-    set({ syncMode: mode, hostId: mode === 'host' ? deviceId : get().hostId });
-    if (mode !== 'off') {
-      pushSyncState(get, true);
-    }
+    const currentHostId = get().hostId || deviceId;
+    const newHostId = mode === 'host' ? deviceId : currentHostId;
+    
+    set({ syncMode: mode, hostId: newHostId });
+    
+    // Update role di database presence
+    void usePresence.getState().updateMyRole(mode);
+    
+    pushSyncState(get, true);
   },
 
   playTrack: async (trackId, contextIds) => {
+    if (get().syncMode === 'speaker') return;
     const lib = useLibrary.getState();
     const track = lib.tracks.find((t) => t.id === trackId);
     if (!track) return;
@@ -113,6 +122,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   playTracks: async (trackIds, startIndex = 0) => {
+    if (get().syncMode === 'speaker') return;
     if (!trackIds.length) return;
     const id = trackIds[startIndex] ?? trackIds[0];
     const rest = trackIds.slice(startIndex + 1);
@@ -122,6 +132,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   togglePlay: () => {
     if (!audioEl || !get().currentTrack) return;
+    if (get().syncMode === 'speaker') {
+      import('./notification').then((mod) => mod.useNotification.getState().show('Mode Speaker: Kontrol dikunci oleh Host', 'info'));
+      return;
+    }
+
     if (audioEl.paused) {
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
@@ -142,6 +157,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   next: async () => {
+    if (get().syncMode === 'speaker') return;
     const { queue, history, repeat, currentTrack, crossfade } = get();
     if (repeat === 'one' && currentTrack && audioEl) {
       audioEl.currentTime = 0;
@@ -162,6 +178,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   prev: async () => {
+    if (get().syncMode === 'speaker') return;
     if (!audioEl) return;
     if (audioEl.currentTime > 3) { audioEl.currentTime = 0; return; }
     const { history, queue, currentTrack } = get();
@@ -176,6 +193,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   seek: (seconds) => {
+    if (get().syncMode === 'speaker') return;
     if (audioEl && isFinite(seconds)) audioEl.currentTime = seconds;
     set({ position: seconds });
     pushSyncState(get);
@@ -188,26 +206,30 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     persist(get);
   },
 
-  toggleShuffle: () => { set((s) => ({ shuffle: !s.shuffle })); persist(get); },
-  cycleRepeat: () => { set((s) => { const nextMode: RepeatMode = s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off'; return { repeat: nextMode }; }); persist(get); },
-  playNext: (trackId) => set((s) => ({ queue: [trackId, ...s.queue] })),
-  addToQueue: (trackId) => set((s) => ({ queue: [...s.queue, trackId] })),
-  removeFromQueue: (index) => set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })),
-  clearQueue: () => set({ queue: [] }),
-  toggleRadioMode: () => { set((s) => ({ radioMode: !s.radioMode })); persist(get); },
+  toggleShuffle: () => { if (get().syncMode === 'speaker') return; set((s) => ({ shuffle: !s.shuffle })); persist(get); },
+  cycleRepeat: () => { if (get().syncMode === 'speaker') return; set((s) => { const nextMode: RepeatMode = s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off'; return { repeat: nextMode }; }); persist(get); },
+  playNext: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [trackId, ...s.queue] })); },
+  addToQueue: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [...s.queue, trackId] })); },
+  removeFromQueue: (index) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })); },
+  clearQueue: () => { if (get().syncMode === 'speaker') return; set({ queue: [] }); },
+  toggleRadioMode: () => { if (get().syncMode === 'speaker') return; set((s) => ({ radioMode: !s.radioMode })); persist(get); },
   setSleepTimer: (minutes) => {
+    if (get().syncMode === 'speaker') return;
     const end = minutes ? Date.now() + minutes * 60 * 1000 : null;
     set({ sleepTimerEnd: end });
     persist(get);
   },
-  toggleCrossfade: () => { set((s) => ({ crossfade: !s.crossfade })); persist(get); },
-  setPlaybackRate: (rate) => { if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); },
-  setVolumeBoost: (boost) => { const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); },
+  toggleCrossfade: () => { if (get().syncMode === 'speaker') return; set((s) => ({ crossfade: !s.crossfade })); persist(get); },
+  setPlaybackRate: (rate) => { if (get().syncMode === 'speaker') return; if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); },
+  setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); },
 
   _onTimeUpdate: () => {
     if (!audioEl) return;
     set({ position: audioEl.currentTime });
-    if (Math.floor(audioEl.currentTime) % 5 === 0) persist(get);
+    if (Math.floor(audioEl.currentTime) % 5 === 0) {
+      persist(get);
+      if (get().syncMode === 'host' && get().isPlaying) pushSyncState(get);
+    }
   },
   _onLoadedMetadata: () => { if (!audioEl) return; set({ duration: audioEl.duration || 0 }); },
   _onEnded: () => void get().next(),
@@ -245,13 +267,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       shuffle: settings.shuffle, 
       repeat: settings.repeat, 
       queue: settings.queue || [],
-      isPlaying: false, // Pastiin pas refresh nggak autoplay
+      isPlaying: false,
     });
     
     if (settings.currentTrackId) {
       const track = useLibrary.getState().tracks.find((t) => t.id === settings.currentTrackId);
       if (track) {
-        // Set track DAN posisinya langsung biar UI langsung berubah
         set({ currentTrack: track, position: settings.position || 0 }); 
         await updateAmbient(track, set);
         
@@ -270,7 +291,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
               if (audioEl && settings.position) {
                 audioEl.currentTime = Math.min(settings.position, audioEl.duration || settings.position);
               }
-              // Set lagi posisinya biar sinkron
               set({ position: settings.position || 0 });
               audioEl?.removeEventListener('loadedmetadata', onLoaded);
             };
@@ -280,53 +300,72 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       }
     }
   },
+
   _handleRemoteSync: (remote) => {
     const state = get();
-    if (state.syncMode === 'off') return;
+    if (!state.syncMode) return;
+    if (remote.originMode === 'speaker') return; 
     
     const isHost = state.syncMode === 'host';
-    const isReceiver = state.syncMode === 'receiver';
+    const isSpeaker = state.syncMode === 'speaker';
     const isRemote = state.syncMode === 'remote';
+
+    // Update state local hostId
+    set({ hostId: remote.hostId });
 
     if (audioEl) {
       if (isRemote) audioEl.volume = 0;
       else audioEl.volume = state.volume * state.volumeBoost;
     }
 
+    // Host abaikan perintah dari dirinya sendiri
     if (isHost && remote.deviceId === usePresence.getState().deviceId) return;
 
-    if (isHost || isReceiver) {
-      const { currentTrack } = get();
-      const lib = useLibrary.getState();
+    const executeSync = () => {
+      if (isHost || isSpeaker) {
+        const { currentTrack } = get();
+        const lib = useLibrary.getState();
 
-      if (remote.trackId && remote.trackId !== currentTrack?.id) {
-        const track = lib.tracks.find(t => t.id === remote.trackId);
-        if (track) {
-          set({ currentTrack: track });
-          if (audioEl) {
-            let url = track.audioUrl || '';
-            if (url.includes('.r2.dev')) url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
-            if (url) {
-              audioEl.src = url;
-              audioEl.currentTime = remote.position;
-              if (remote.isPlaying) void audioEl.play().catch(() => {});
-              else audioEl.pause();
+        const timeDiff = (Date.now() - remote.updatedAt) / 1000;
+        const delayOffset = isSpeaker ? (SYNC_DELAY_MS / 1000) : 0;
+        const expectedPos = remote.position + (remote.isPlaying ? timeDiff : 0) + delayOffset;
+
+        if (remote.trackId && remote.trackId !== currentTrack?.id) {
+          const track = lib.tracks.find(t => t.id === remote.trackId);
+          if (track) {
+            set({ currentTrack: track });
+            if (audioEl) {
+              let url = track.audioUrl || '';
+              if (url.includes('.r2.dev')) {
+                url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
+              }
+              if (url) {
+                audioEl.src = url;
+                audioEl.currentTime = expectedPos;
+                if (remote.isPlaying) void audioEl.play().catch(() => {});
+                else audioEl.pause();
+              }
             }
           }
+        } else if (audioEl && currentTrack) {
+          if (Math.abs(audioEl.currentTime - expectedPos) > 1.0) {
+            audioEl.currentTime = expectedPos;
+          }
+          if (remote.isPlaying && audioEl.paused) void audioEl.play().catch(() => {});
+          if (!remote.isPlaying && !audioEl.paused) audioEl.pause();
         }
-      } else if (audioEl && currentTrack) {
-        const timeDiff = (Date.now() - remote.updatedAt) / 1000;
-        const expectedPos = remote.position + (remote.isPlaying ? timeDiff : 0);
-        if (Math.abs(audioEl.currentTime - expectedPos) > 1.5) {
-          audioEl.currentTime = expectedPos;
-        }
-        if (remote.isPlaying && audioEl.paused) void audioEl.play().catch(() => {});
-        if (!remote.isPlaying && !audioEl.paused) audioEl.pause();
+      } else if (isRemote) {
+        const lib = useLibrary.getState();
+        const track = lib.tracks.find(t => t.id === remote.trackId);
+        if (track) set({ currentTrack: track, position: remote.position, isPlaying: remote.isPlaying });
       }
-    } else if (isRemote) {
-      const lib = useLibrary.getState();
-      const track = lib.tracks.find(t => t.id === remote.trackId);
-      if (track) set({ currentTrack: track, position: remote.position, isPlaying: remote.isPlaying });
+    };
+
+    if (isSpeaker) {
+      if (speakerSyncTimeout) clearTimeout(speakerSyncTimeout);
+      speakerSyncTimeout = setTimeout(executeSync, SYNC_DELAY_MS);
+    } else {
+      executeSync();
     }
   },
 }));
@@ -385,7 +424,8 @@ function persist(get: () => PlayerState) {
 function pushSyncState(get: () => PlayerState, force = false) {
   const state = get();
   const user = useAuth.getState().user;
-  if (!user || (state.syncMode === 'off' && !force)) return;
+  if (!user || !state.syncMode) return;
+  if (state.syncMode === 'speaker' && !force) return;
 
   const deviceId = usePresence.getState().deviceId;
 
@@ -396,6 +436,7 @@ function pushSyncState(get: () => PlayerState, force = false) {
     isPlaying: state.isPlaying,
     position: audioEl?.currentTime || 0,
     updatedAt: Date.now(),
+    originMode: state.syncMode,
   });
 }
 
