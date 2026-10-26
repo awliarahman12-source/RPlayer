@@ -51,6 +51,11 @@ export async function updateSyncPlayback(username: string, state: SyncPlaybackSt
   await setDoc(doc(db, 'users', username, 'sync', 'playback'), cleanUndefined(state));
 }
 
+export async function getSyncPlayback(username: string): Promise<SyncPlaybackState | null> {
+  const snap = await getDoc(doc(db, 'users', username, 'sync', 'playback'));
+  return snap.exists() ? (snap.data() as SyncPlaybackState) : null;
+}
+
 export function onSyncPlaybackChange(username: string, callback: (state: SyncPlaybackState) => void) {
   return onSnapshot(doc(db, 'users', username, 'sync', 'playback'), (docSnap) => {
     if (docSnap.exists()) {

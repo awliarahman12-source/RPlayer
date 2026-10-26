@@ -56,11 +56,10 @@ interface PlayerState {
   _detach: () => void;
   _restore: (settings: PlayerSettings) => Promise<void>;
   _handleRemoteSync: (remote: SyncPlaybackState) => void;
+  _forceSyncWithHost: () => Promise<void>;
 }
 
 let audioEl: HTMLAudioElement | null = null;
-let speakerSyncTimeout: ReturnType<typeof setTimeout> | null = null;
-const SYNC_DELAY_MS = 300;
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -96,15 +95,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   setSyncMode: (mode) => {
     if (!mode) return;
     const deviceId = usePresence.getState().deviceId;
-    const currentHostId = get().hostId || deviceId;
-    const newHostId = mode === 'host' ? deviceId : currentHostId;
+    set({ syncMode: mode, hostId: mode === 'host' ? deviceId : get().hostId });
     
-    set({ syncMode: mode, hostId: newHostId });
-    
-    // Update role di database presence
     void usePresence.getState().updateMyRole(mode);
     
     pushSyncState(get, true);
+    if (mode === 'remote') {
+      void get()._forceSyncWithHost();
+    }
   },
 
   playTrack: async (trackId, contextIds) => {
@@ -158,7 +156,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   next: async () => {
     if (get().syncMode === 'speaker') return;
-    const { queue, history, repeat, currentTrack, crossfade } = get();
+    const { queue, history, repeat, currentTrack } = get();
     if (repeat === 'one' && currentTrack && audioEl) {
       audioEl.currentTime = 0;
       void audioEl.play().catch(() => {});
@@ -301,6 +299,17 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }
   },
 
+  _forceSyncWithHost: async () => {
+    const user = useAuth.getState().user;
+    if (!user) return;
+    try {
+      const remote = await fs.getSyncPlayback(user);
+      if (remote) get()._handleRemoteSync(remote);
+    } catch (e) {
+      console.error("Gagal force sync", e);
+    }
+  },
+
   _handleRemoteSync: (remote) => {
     const state = get();
     if (!state.syncMode) return;
@@ -310,7 +319,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     const isSpeaker = state.syncMode === 'speaker';
     const isRemote = state.syncMode === 'remote';
 
-    // Update state local hostId
     set({ hostId: remote.hostId });
 
     if (audioEl) {
@@ -318,54 +326,58 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       else audioEl.volume = state.volume * state.volumeBoost;
     }
 
-    // Host abaikan perintah dari dirinya sendiri
     if (isHost && remote.deviceId === usePresence.getState().deviceId) return;
 
-    const executeSync = () => {
-      if (isHost || isSpeaker) {
-        const { currentTrack } = get();
-        const lib = useLibrary.getState();
+    if (isHost || isSpeaker) {
+      const { currentTrack } = get();
+      const lib = useLibrary.getState();
 
-        const timeDiff = (Date.now() - remote.updatedAt) / 1000;
-        const delayOffset = isSpeaker ? (SYNC_DELAY_MS / 1000) : 0;
-        const expectedPos = remote.position + (remote.isPlaying ? timeDiff : 0) + delayOffset;
+      const timeDiff = (Date.now() - remote.updatedAt) / 1000;
+      const expectedPos = remote.position + (remote.isPlaying ? timeDiff : 0);
 
-        if (remote.trackId && remote.trackId !== currentTrack?.id) {
-          const track = lib.tracks.find(t => t.id === remote.trackId);
-          if (track) {
-            set({ currentTrack: track });
-            if (audioEl) {
-              let url = track.audioUrl || '';
-              if (url.includes('.r2.dev')) {
-                url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
-              }
-              if (url) {
-                audioEl.src = url;
-                audioEl.currentTime = expectedPos;
-                if (remote.isPlaying) void audioEl.play().catch(() => {});
-                else audioEl.pause();
-              }
+      if (remote.trackId && remote.trackId !== currentTrack?.id) {
+        const track = lib.tracks.find(t => t.id === remote.trackId);
+        if (track) {
+          set({ currentTrack: track });
+          if (audioEl) {
+            let url = track.audioUrl || '';
+            if (url.includes('.r2.dev')) {
+              url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
+            }
+            if (url) {
+              audioEl.src = url;
+              audioEl.currentTime = expectedPos;
+              if (remote.isPlaying) void audioEl.play().catch(() => {});
+              else audioEl.pause();
             }
           }
-        } else if (audioEl && currentTrack) {
-          if (Math.abs(audioEl.currentTime - expectedPos) > 1.0) {
-            audioEl.currentTime = expectedPos;
-          }
-          if (remote.isPlaying && audioEl.paused) void audioEl.play().catch(() => {});
-          if (!remote.isPlaying && !audioEl.paused) audioEl.pause();
         }
-      } else if (isRemote) {
-        const lib = useLibrary.getState();
-        const track = lib.tracks.find(t => t.id === remote.trackId);
-        if (track) set({ currentTrack: track, position: remote.position, isPlaying: remote.isPlaying });
+      } else if (audioEl && currentTrack) {
+        if (Math.abs(audioEl.currentTime - expectedPos) > 0.5) {
+          audioEl.currentTime = expectedPos;
+        }
+        if (remote.isPlaying && audioEl.paused) void audioEl.play().catch(() => {});
+        if (!remote.isPlaying && !audioEl.paused) audioEl.pause();
       }
-    };
-
-    if (isSpeaker) {
-      if (speakerSyncTimeout) clearTimeout(speakerSyncTimeout);
-      speakerSyncTimeout = setTimeout(executeSync, SYNC_DELAY_MS);
-    } else {
-      executeSync();
+    } else if (isRemote) {
+      const lib = useLibrary.getState();
+      const track = lib.tracks.find(t => t.id === remote.trackId);
+      if (track) {
+        set({ currentTrack: track });
+        if (audioEl) {
+           let url = track.audioUrl || '';
+           if (url.includes('.r2.dev')) url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
+           if (url && audioEl.src !== url) {
+             audioEl.src = url;
+           }
+           if (audioEl) {
+             audioEl.currentTime = remote.position;
+             if (remote.isPlaying && audioEl.paused) void audioEl.play().catch(() => {});
+             if (!remote.isPlaying && !audioEl.paused) audioEl.pause();
+           }
+        }
+        set({ position: remote.position, isPlaying: remote.isPlaying });
+      }
     }
   },
 }));

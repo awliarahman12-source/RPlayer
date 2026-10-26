@@ -1,14 +1,15 @@
 import { create } from 'zustand';
-import { doc, setDoc, onSnapshot, collection, query, where, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { ActiveDevice } from '@/types';
+import type { ActiveDevice, SyncMode } from '@/types';
 import { useAuth } from './auth';
+import { usePlayer } from './player';
 
 interface PresenceState {
   devices: ActiveDevice[];
   deviceId: string;
-  startPresence: () => void;
-  stopPresence: () => void;
+  startPresence: () => (() => void) | void;
+  updateMyRole: (role: SyncMode) => Promise<void>;
 }
 
 const myDeviceId = Math.random().toString(36).substring(7);
@@ -22,25 +23,55 @@ export const usePresence = create<PresenceState>((set, get) => ({
     const user = useAuth.getState().user;
     if (!user) return;
 
-    // 1. Daftarin device ini ke Firestore
     const deviceRef = doc(db, 'users', user, 'active_devices', myDeviceId);
-    const updatePresence = () => {
-      void setDoc(deviceRef, {
-        deviceId: myDeviceId,
-        deviceType: isMobile ? 'mobile' : 'desktop',
-        lastActive: Date.now()
-      });
-    };
     
-    updatePresence();
-    const interval = setInterval(updatePresence, 30000); // Update tiap 30 detik
+    const initDevice = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users', user, 'active_devices'));
+        const now = Date.now();
+        
+        // Cari apakah ada device lain yang udah jadi Host DAN masih aktif (heartbeat < 1 menit)
+        const activeHost = snap.docs
+          .map(d => d.data() as ActiveDevice)
+          .find(d => d.deviceId !== myDeviceId && d.role === 'host' && (now - d.lastActive < 60000));
 
-    // 2. Dengerin device lain
+        // Tentukan role otomatis
+        const myRole: SyncMode = activeHost ? 'remote' : 'host';
+
+        // Simpan ke database
+        await setDoc(deviceRef, {
+          deviceId: myDeviceId,
+          deviceType: isMobile ? 'mobile' : 'desktop',
+          role: myRole,
+          lastActive: Date.now()
+        });
+
+        // Set ke state lokal (Zustand)
+        usePlayer.setState({ syncMode: myRole });
+        
+        // Kalau jadi Remote, langsung minta sinkronisasi posisi terakhir dari Host
+        if (myRole === 'remote') {
+          usePlayer.getState()._forceSyncWithHost();
+        }
+
+      } catch (err) {
+        console.error("Gagal inisialisasi presence", err);
+      }
+    };
+
+    void initDevice();
+
+    // Heartbeat setiap 15 detik biar dianggap masih aktif
+    const interval = setInterval(() => {
+      void setDoc(deviceRef, { lastActive: Date.now() }, { merge: true });
+    }, 15000);
+
+    // Listener buat mantau device lain & update UI
     const unsub = onSnapshot(collection(db, 'users', user, 'active_devices'), (snap) => {
       const now = Date.now();
       const active = snap.docs
         .map(d => d.data() as ActiveDevice)
-        .filter(d => now - d.lastActive < 60000); // Anggap aktif kalau update < 1 menit lalu
+        .filter(d => now - d.lastActive < 60000);
       set({ devices: active });
     });
 
@@ -50,9 +81,24 @@ export const usePresence = create<PresenceState>((set, get) => ({
     };
   },
 
-  stopPresence: () => {
+  updateMyRole: async (newRole) => {
     const user = useAuth.getState().user;
     if (!user) return;
-    void setDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { lastActive: 0 }, { merge: true });
+    
+    // Kalau mau jadi Host, turunin Host lama jadi Remote
+    if (newRole === 'host') {
+      const oldHost = get().devices.find(d => d.role === 'host' && d.deviceId !== myDeviceId);
+      if (oldHost) {
+        await updateDoc(doc(db, 'users', user, 'active_devices', oldHost.deviceId), {
+          role: 'remote'
+        });
+      }
+    }
+
+    // Update role device ini
+    await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), {
+      role: newRole,
+      lastActive: Date.now()
+    });
   }
 }));
