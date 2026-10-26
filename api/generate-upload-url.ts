@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
       Key: key,
-      ContentType: contentType,
+      // ContentType: contentType, <--- SUDAH DIHAPUS BIAR CORS LOLOS
     });
 
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
