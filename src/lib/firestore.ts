@@ -1,6 +1,6 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Track, Playlist } from '@/types';
+import type { Track, Playlist, SyncPlaybackState } from '@/types';
 
 // Fungsi buat ngehapus field yang undefined biar Firestore nggak error
 const cleanUndefined = <T extends object>(obj: T): T => {
@@ -44,4 +44,17 @@ export async function saveSettingsToCloud(username: string, settings: any) {
 export async function getSettingsFromCloud(username: string): Promise<any> {
   const snap = await getDoc(doc(db, 'users', username, 'settings', 'player'));
   return snap.exists() ? snap.data() : null;
+}
+
+// ---- Sync Playback (Remote, Receiver, Host) ----
+export async function updateSyncPlayback(username: string, state: SyncPlaybackState) {
+  await setDoc(doc(db, 'users', username, 'sync', 'playback'), cleanUndefined(state));
+}
+
+export function onSyncPlaybackChange(username: string, callback: (state: SyncPlaybackState) => void) {
+  return onSnapshot(doc(db, 'users', username, 'sync', 'playback'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data() as SyncPlaybackState);
+    }
+  });
 }

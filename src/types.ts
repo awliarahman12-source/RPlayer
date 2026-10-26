@@ -1,3 +1,19 @@
+// Tambahkan di bagian paling atas file
+export interface ActiveDevice {
+  deviceId: string;
+  deviceType: 'mobile' | 'desktop';
+  lastActive: number;
+}
+
+export interface SyncPlaybackState {
+  deviceId: string;
+  hostId: string; // Device yang jadi Host utama
+  trackId: string | null;
+  isPlaying: boolean;
+  position: number;
+  updatedAt: number;
+}
+
 export interface Track {
   id: string;
   title: string;

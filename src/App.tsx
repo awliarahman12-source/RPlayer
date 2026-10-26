@@ -16,7 +16,8 @@ import { SettingsPage } from '@/pages/Settings';
 import { ExplorePage } from '@/pages/Explore';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
-import { getSettingsFromCloud } from '@/lib/firestore';
+import { getSettingsFromCloud, onSyncPlaybackChange } from '@/lib/firestore';
+import { usePresence } from '@/store/presence';
 import { useAuth } from '@/store/auth';
 import { LoginPage } from '@/pages/Login';
 import { PartyGuestPage } from '@/pages/PartyGuest';
@@ -59,21 +60,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (audioRef.current) {
-      usePlayer.getState()._attach(audioRef.current);
-    }
-
-    void load().then(async () => {
-      try {
-        const settings = user ? await getSettingsFromCloud(user) : null;
-        if (settings) await usePlayer.getState()._restore(settings);
-      } catch (err) {
-        console.error("Gagal narik settingan cloud:", err);
-      }
+    if (!user) return;
+    const unsub = onSyncPlaybackChange(user, (state) => {
+      usePlayer.getState()._handleRemoteSync(state);
     });
-
-    return () => usePlayer.getState()._detach();
-  }, [load, user]);
+    const stopPresence = usePresence.getState().startPresence();
+    return () => {
+      unsub();
+      if (typeof stopPresence === 'function') stopPresence();
+    };
+  }, [user]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

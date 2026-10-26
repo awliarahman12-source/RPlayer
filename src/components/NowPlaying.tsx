@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDominantColor } from '@/lib/color';
 import { GuessTheSong } from './GuessTheSong';
-import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, Radio, Gamepad2 } from 'lucide-react';
+import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, Radio, Gamepad2, Monitor, Smartphone, Cast } from 'lucide-react';
+import { usePresence } from '@/store/presence';
 import { usePlayer } from '@/store/player';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
@@ -43,8 +44,10 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   const [touchEndX, setTouchEndX] = useState(0);
   const [lastTap, setLastTap] = useState(0);
   const [gameOpen, setGameOpen] = useState(false);
-  const radioMode = usePlayer((s) => s.radioMode);
-  const toggleRadioMode = usePlayer((s) => s.toggleRadioMode);
+  const { syncMode, setSyncMode } = usePlayer();
+  const devices = usePresence((s) => s.devices);
+  const myDeviceId = usePresence((s) => s.deviceId);
+  const otherDevices = devices.filter(d => d.deviceId !== myDeviceId);
 
   // Dynamic Theme
   useEffect(() => {
@@ -169,7 +172,18 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
       <div className="relative z-10 flex-1 flex flex-col px-5 pt-safe pb-6 overflow-y-auto scroll-hidden" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <div className="flex items-center justify-between py-3">
           <button className="tap glass-pill w-10 h-10 flex items-center justify-center text-white" onClick={onClose} aria-label="Tutup"><ChevronDown className="w-5 h-5" /></button>
-          <div className="text-xs uppercase tracking-wider text-white/70 font-semibold">Now Playing</div>
+          <div className="flex flex-col items-center">
+            <div className="text-xs uppercase tracking-wider text-white/70 font-semibold">Now Playing</div>
+            {otherDevices.length > 0 && (
+              <div className="flex gap-1 mt-1">
+                {otherDevices.map(d => (
+                  <div key={d.deviceId} className="p-1 bg-white/10 rounded-full" title={`${d.deviceType} aktif`}>
+                    {d.deviceType === 'mobile' ? <Smartphone className="w-3 h-3 text-accent" /> : <Monitor className="w-3 h-3 text-accent" />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <button className="tap glass-pill w-10 h-10 flex items-center justify-center" onClick={() => toggleLike(track.id)} aria-label="Like">
             <Heart className={`w-5 h-5 ${track.liked ? 'fill-accent text-accent' : 'text-white'}`} />
           </button>
@@ -200,8 +214,15 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${playbackRate !== 1 ? 'text-accent' : 'text-white'}`} onClick={() => { const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(nextRate); pushToast(`Kecepatan: ${nextRate}x`); }}>
               <Gauge className="w-4 h-4" /> {playbackRate}x
             </button>
-            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${radioMode ? 'text-accent' : 'text-white'}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
-              <Radio className="w-4 h-4" /> Radio
+            <button 
+              className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} 
+              onClick={() => { 
+                const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
+                setSyncMode(nextMode); 
+                pushToast(`Mode: ${nextMode.toUpperCase()}`); 
+              }}
+            >
+              <Cast className="w-4 h-4" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
             </button>
             <button className="tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 text-white" onClick={() => setGameOpen(true)}>
               <Gamepad2 className="w-4 h-4" /> Game
