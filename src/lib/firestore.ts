@@ -2,17 +2,7 @@ import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore'
 import { db } from './firebase';
 import type { Track, Playlist } from '@/types';
 
-// Fungsi buat ngehapus field yang undefined
-const cleanUndefined = <T extends object>(obj: T): T => {
-  const newObj = { ...obj };
-  Object.keys(newObj).forEach((key) => {
-    if (newObj[key as keyof T] === undefined) {
-      delete newObj[key as keyof T];
-    }
-  });
-  return newObj;
-};
-
+// Fungsi buat ngehapus field yang undefined biar Firestore nggak error
 const cleanUndefined = <T extends object>(obj: T): T => {
   const newObj = { ...obj };
   Object.keys(newObj).forEach((key) => {
@@ -43,7 +33,6 @@ export async function getPlaylistsFromCloud(username: string): Promise<Playlist[
   return snap.docs.map((d) => d.data() as Playlist).sort((a, b) => a.createdAt - b.createdAt);
 }
 
-// Tambahan buat hapus playlist dari cloud
 export async function deletePlaylistFromCloud(username: string, playlistId: string) {
   await deleteDoc(doc(db, 'users', username, 'playlists', playlistId));
 }
