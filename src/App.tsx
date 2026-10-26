@@ -35,10 +35,10 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/explore" element={<ExplorePage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/playlist/:id" element={<PlaylistDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/explore" element={<ExplorePage />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
@@ -49,22 +49,17 @@ export default function App() {
   const load = useLibrary((s) => s.load);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
-  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    const handleClick = () => {
-      if (navigator.vibrate) navigator.vibrate(10);
-    };
+    const handleClick = () => { if (navigator.vibrate) navigator.vibrate(10); };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
   useEffect(() => {
-    if (!user || !audioRef.current) return;
-    usePlayer.getState()._attach(audioRef.current);
     void load().then(async () => {
-      const settings = user ? await getSettingsFromCloud(user) : null;
-
+      const settings = await getSettingsFromCloud(); // Ambil dari cloud
+      if (audioRef.current) usePlayer.getState()._attach(audioRef.current);
       if (settings) await usePlayer.getState()._restore(settings);
     });
     return () => usePlayer.getState()._detach();
@@ -86,64 +81,47 @@ export default function App() {
   }, []);
 
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
-
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      // load() sudah dipanggil di efek attach di atas
-    }
+    if (user) { void load(); }
   }, [user, load]);
 
-  if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
-  }
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
 
   return (
     <HashRouter>
       {!user ? (
-        <Routes>
-          <Route path="*" element={<LoginPage />} />
-        </Routes>
+        <Routes><Route path="*" element={<LoginPage />} /></Routes>
       ) : (
         <>
           <AmbientBackground />
           <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
           <DynamicIsland />
 
-      {/* 1. Kunci tinggi layar utama (h-[100dvh] & overflow-hidden) */}
-      <div className="h-[100dvh] overflow-hidden flex">
-        {/* 2. Sidebar full height */}
-        <div className="hidden lg:block w-[280px] shrink-0 p-3 pr-0 h-full">
-          <Sidebar />
-        </div>
-
-        {/* 3. Main content full height */}
-        <main className="flex-1 min-w-0 flex h-full">
-          {/* 4. Area tengah bisa di-scroll (tambahin overflow-y-auto) */}
-          <div 
-            className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-28 overflow-y-auto scroll-hidden" 
-            style={{
-              paddingBottom: hasCurrent
-                ? 'calc(env(safe-area-inset-bottom) + 200px)' // Ditambahin biar lagu terakhir nggak ketutup
-                : 'calc(env(safe-area-inset-bottom) + 120px)',  
-            }}
-          >
-            <AnimatedRoutes />
+          <div className="h-[100dvh] overflow-hidden flex transform-gpu"> {/* transform-gpu buat fix iOS blank */}
+            <div className="hidden lg:block w-[280px] shrink-0 p-3 pr-0 h-full"><Sidebar /></div>
+            <main className="flex-1 min-w-0 flex h-full">
+              <div 
+                className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-36 overflow-y-auto scroll-hidden transform-gpu" 
+                style={{
+                  paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 220px)' : 'calc(env(safe-area-inset-bottom) + 120px)', // Padding digedein biar nggak kehalang
+                }}
+              >
+                <AnimatedRoutes />
+              </div>
+              <div className="hidden lg:block w-[340px] shrink-0 p-3 pl-0 h-full">
+                <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" />
+              </div>
+            </main>
           </div>
-          
-          {/* 5. Panel kanan full height (nggak ikut scroll) */}
-          <div className="hidden lg:block w-[340px] shrink-0 p-3 pl-0 h-full">
-            <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" />
+
+          <div className="lg:hidden fixed inset-x-0 bottom-0 z-[80] flex flex-col gap-2 px-3 pointer-events-none" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}>
+            {hasCurrent && <div className="pointer-events-auto w-full shadow-lg"><MiniPlayer onExpand={() => setNowOpen(true)} /></div>}
+            <div className="pointer-events-auto w-full"><TabBar /></div>
           </div>
-        </main>
-      </div>
 
-      <div className="lg:hidden fixed inset-x-0 bottom-0 z-[80] flex flex-col gap-2 px-3 pointer-events-none" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}>
-        {hasCurrent && <div className="pointer-events-auto w-full shadow-lg"><MiniPlayer onExpand={() => setNowOpen(true)} /></div>}
-        <div className="pointer-events-auto w-full"><TabBar /></div>
-      </div>
-
-      <div className="hidden lg:block"><PlayerBar onExpand={() => setNowOpen(true)} /></div>
+          <div className="hidden lg:block"><PlayerBar onExpand={() => setNowOpen(true)} /></div>
           <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="mobile" />
         </>
       )}
