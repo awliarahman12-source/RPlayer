@@ -1,4 +1,4 @@
-import { Heart, ListPlus, Plus, Trash2, PlayCircle, Pencil } from 'lucide-react';
+import { Heart, ListPlus, Plus, Trash2, PlayCircle, Pencil, Download, CheckCircle2 } from 'lucide-react';
 import type { Track } from '@/types';
 import { BottomSheet } from './BottomSheet';
 import { useLibrary } from '@/store/library';
