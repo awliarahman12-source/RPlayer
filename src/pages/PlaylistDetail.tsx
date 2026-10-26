@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X } from 'lucide-react';
+import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
@@ -9,7 +9,7 @@ import { Cover } from '@/components/Cover';
 import { formatDuration } from '@/lib/format';
 import { BottomSheet } from '@/components/BottomSheet';
 import { UploadButton } from '@/components/Upload';
-import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { SortableTrackRow } from '@/components/SortableTrackRow';
 
@@ -21,12 +21,14 @@ export function PlaylistDetailPage() {
   const renamePlaylist = useLibrary((s) => s.renamePlaylist);
   const removePlaylist = useLibrary((s) => s.removePlaylist);
   const reorderPlaylistTracks = useLibrary((s) => s.reorderPlaylistTracks);
+  const updatePlaylistCover = useLibrary((s) => s.updatePlaylistCover);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
   const pushToast = useToast((s) => s.push);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,13 +62,22 @@ export function PlaylistDetailPage() {
   return (
     <div className="px-4 lg:px-8 py-6 max-w-[1100px] mx-auto">
       <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 mb-6">
-        <div className="relative">
+        <div className="relative group">
           {isLiked ? (
             <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-glass bg-gradient-to-br from-accent to-emerald-700 flex items-center justify-center shadow-2xl">
               <Heart className="w-16 h-16 fill-white text-white" />
             </div>
           ) : (
-            <Cover src={cover} alt={name} className="w-40 h-40 sm:w-48 sm:h-48 shadow-2xl" rounded="xl" />
+            <>
+              <Cover src={cover} alt={name} className="w-40 h-40 sm:w-48 sm:h-48 shadow-2xl" rounded="xl" />
+              {/* Tombol Ganti Cover Overlay */}
+              <button 
+                className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity tap cursor-pointer"
+                onClick={() => setCoverOpen(true)}
+              >
+                <Image className="w-8 h-8 text-white" />
+              </button>
+            </>
           )}
         </div>
         <div className="flex-1 text-center sm:text-left min-w-0">
@@ -149,6 +160,7 @@ export function PlaylistDetailPage() {
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={name}>
         <div className="space-y-1">
           <SheetItem icon={<Pencil className="w-5 h-5" />} label="Ganti nama" onClick={() => { setNameInput(name); setRenaming(true); setMenuOpen(false); }} />
+          <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
           <SheetItem icon={<Plus className="w-5 h-5" />} label="Tambah lagu" onClick={() => { setMenuOpen(false); navigate('/library'); pushToast('Cari lagu lalu pakai menu "Tambahkan ke playlist"'); }} />
           <div className="h-px bg-white/10 my-1" />
           <SheetItem icon={<Trash2 className="w-5 h-5" />} label="Hapus playlist" danger onClick={() => {
@@ -159,6 +171,35 @@ export function PlaylistDetailPage() {
           }} />
         </div>
       </BottomSheet>
+
+      {/* Modal Ganti Cover */}
+      {coverOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass-strong rounded-3xl p-6 w-full max-w-sm space-y-4">
+            <h2 className="text-xl font-bold text-white">Ganti Cover Playlist</h2>
+            <p className="text-xs text-white/50">Pilih gambar dari galeri kamu (JPG/PNG).</p>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file && playlist) {
+                  const reader = new FileReader();
+                  reader.onload = async () => {
+                    const base64 = reader.result as string;
+                    await updatePlaylistCover(playlist.id, base64);
+                    pushToast('Cover playlist diperbarui');
+                    setCoverOpen(false);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="w-full text-sm text-white/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-black hover:file:bg-accent/80 tap"
+            />
+            <button onClick={() => setCoverOpen(false)} className="w-full glass-pill py-2 text-sm tap text-white">Batal</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

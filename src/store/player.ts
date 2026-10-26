@@ -285,7 +285,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         set({ currentTrack: track });
         await updateAmbient(track, set);
         if (audioEl) {
-          const url = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+          // Kalau ada audioUrl dari R2, pakai itu. Kalau nggak ada, fallback ke IndexedDB lokal
+    const url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
           if (url && audioEl) {
             audioEl.src = url;
             audioEl.load();

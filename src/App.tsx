@@ -83,6 +83,12 @@ export default function App() {
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
   const { user, loading: authLoading } = useAuth();
 
+  useEffect(() => {
+    if (user) {
+      void load(); // Tarik data dari Firestore pas user login
+    }
+  }, [user, load]);
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
   }
