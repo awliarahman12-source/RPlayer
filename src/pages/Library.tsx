@@ -4,7 +4,7 @@ import { usePlayer } from '@/store/player';
 import { useAuth } from './auth';
 import * as fs from '@/lib/firestore';
 import * as db from '@/lib/db';
-import { useNotification } from './notification';
+import { useNotification } from '@/store/notification';
 
 interface LibraryState {
   tracks: Track[];
