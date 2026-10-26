@@ -47,6 +47,7 @@ export default function App() {
   const load = useLibrary((s) => s.load);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const handleClick = () => {
@@ -57,9 +58,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!user || !audioRef.current) return;
+    usePlayer.getState()._attach(audioRef.current);
     void load().then(async () => {
       const settings = await getSettings();
-      if (audioRef.current) usePlayer.getState()._attach(audioRef.current);
+
       if (settings) await usePlayer.getState()._restore(settings);
     });
     return () => usePlayer.getState()._detach();
@@ -81,11 +84,11 @@ export default function App() {
   }, []);
 
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
-  const { user, loading: authLoading } = useAuth();
+
 
   useEffect(() => {
     if (user) {
-      void load(); // Tarik data dari Firestore pas user login
+      // load() sudah dipanggil di efek attach di atas
     }
   }, [user, load]);
 

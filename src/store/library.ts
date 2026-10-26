@@ -68,7 +68,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           const res = await fetch('/api/generate-upload-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: file.name, contentType: file.type })
+            body: JSON.stringify({ filename: file.name, contentType: file.type || 'audio/mpeg' })
           });
           
           if (!res.ok) throw new Error('Gagal konek ke API Vercel');
@@ -78,7 +78,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl, true);
-            // xhr.setRequestHeader('Content-Type', file.type); <--- SUDAH DIHAPUS
+            xhr.setRequestHeader('Content-Type', file.type || 'audio/mpeg');
             
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {

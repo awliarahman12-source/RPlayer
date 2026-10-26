@@ -15,12 +15,13 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { filename, contentType } = req.body;
-    const key = `${Date.now()}-${filename}`;
+    const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const key = `${Date.now()}-${safeName}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
       Key: key,
-      // ContentType: contentType, <--- SUDAH DIHAPUS BIAR CORS LOLOS
+      ContentType: contentType || 'audio/mpeg',
     });
 
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });

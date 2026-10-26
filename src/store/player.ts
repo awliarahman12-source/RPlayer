@@ -3,11 +3,12 @@ import type { Track, RepeatMode, PlayerSettings } from '@/types';
 import { useLibrary } from './library';
 import * as db from '@/lib/db';
 import { getTrackUrl, getDominantColor } from '@/lib/metadata';
-import { initAudioEngine } from '@/lib/audioEngine';
+
 
 interface PlayerState {
   currentTrack: Track | null;
   isPlaying: boolean;
+  isBuffering: boolean;
   position: number;
   duration: number;
   volume: number;
@@ -51,6 +52,12 @@ interface PlayerState {
 
 let audioEl: HTMLAudioElement | null = null;
 
+function fixUrl(u?: string): string | undefined {
+  const base = import.meta.env.VITE_R2_PUBLIC_URL as string | undefined;
+  if (!u || !base) return u;
+  return u.replace(/^https:\/\/pub-[a-z0-9]+\.r2\.dev/, base.replace(/\/$/, ''));
+}
+
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -63,6 +70,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 export const usePlayer = create<PlayerState>((set, get) => ({
   currentTrack: null,
   isPlaying: false,
+  isBuffering: false,
   position: 0,
   duration: 0,
   volume: 0.8,
@@ -242,7 +250,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   _onError: () => {
     const { currentTrack } = get();
-    set({ error: `Tidak bisa memutar: ${currentTrack?.title}` });
+    console.error('Audio error', audioEl?.error?.code, audioEl?.src);
+    set({ isPlaying: false, isBuffering: false, error: `Tidak bisa memutar: ${currentTrack?.title} (sumber audio tidak bisa diakses)` });
     setTimeout(() => void get().next(), 800);
   },
 
@@ -254,8 +263,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     audioEl.addEventListener('loadedmetadata', get()._onLoadedMetadata);
     audioEl.addEventListener('ended', get()._onEnded);
     audioEl.addEventListener('error', get()._onError);
-    audioEl.addEventListener('play', () => { set({ isPlaying: true }); updateMediaSession(get); });
-    audioEl.addEventListener('pause', () => { set({ isPlaying: false }); updateMediaSession(get); });
+    audioEl.addEventListener('play', () => set({ isBuffering: true }));
+    audioEl.addEventListener('playing', () => { set({ isPlaying: true, isBuffering: false, error: null }); updateMediaSession(get); });
+    audioEl.addEventListener('waiting', () => set({ isBuffering: true }));
+    audioEl.addEventListener('canplay', () => set({ isBuffering: false }));
+    audioEl.addEventListener('pause', () => { set({ isPlaying: false, isBuffering: false }); updateMediaSession(get); });
     persist(get);
   },
 
@@ -286,7 +298,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         await updateAmbient(track, set);
         if (audioEl) {
           // Kalau ada audioUrl dari R2, pakai itu. Kalau nggak ada, fallback ke IndexedDB lokal
-    const url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    const url = fixUrl(track.audioUrl) || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
           if (url && audioEl) {
             audioEl.src = url;
             audioEl.load();
@@ -315,7 +327,16 @@ async function loadAndPlay(track: Track, set: any, get: any) {
     if (get().currentTrack?.id !== track.id) return;
     audioEl.src = url;
     audioEl.currentTime = 0;
-    await audioEl.play().catch((e) => console.warn('play() rejected', e));
+    set({ isBuffering: true });
+    const el = audioEl;
+    window.setTimeout(() => {
+      if (get().currentTrack?.id === track.id && el.readyState === 0) {
+        set({ isPlaying: false, isBuffering: false, error: 'Koneksi ke server audio timeout (cek ISP / custom domain R2)' });
+      }
+    }, 15000);
+    await audioEl.play().catch((e) => {
+      if (e?.name !== 'AbortError') console.warn('play() rejected', e);
+    });
     void updateAmbient(track, set);
     void db.updateTrack(track.id, { lastPlayedAt: Date.now() });
     useLibrary.setState((s) => ({
