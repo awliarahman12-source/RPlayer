@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Track, Playlist } from '@/types';
 
