@@ -241,24 +241,37 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   _restore: async (settings) => {
     set({
-      volume: settings.volume, shuffle: settings.shuffle, repeat: settings.repeat, queue: settings.queue || [],
+      volume: settings.volume, 
+      shuffle: settings.shuffle, 
+      repeat: settings.repeat, 
+      queue: settings.queue || [],
+      isPlaying: false, // Pastiin pas refresh nggak autoplay
     });
+    
     if (settings.currentTrackId) {
       const track = useLibrary.getState().tracks.find((t) => t.id === settings.currentTrackId);
       if (track) {
-        set({ currentTrack: track });
+        // Set track DAN posisinya langsung biar UI langsung berubah
+        set({ currentTrack: track, position: settings.position || 0 }); 
         await updateAmbient(track, set);
+        
         if (audioEl) {
           const localUrl = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
           let url = localUrl || track.audioUrl;
+
           if (url && url.includes('.r2.dev')) {
             url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
           }
+          
           if (url && audioEl) {
             audioEl.src = url;
             audioEl.load();
             const onLoaded = () => {
-              if (audioEl && settings.position) audioEl.currentTime = Math.min(settings.position, audioEl.duration || settings.position);
+              if (audioEl && settings.position) {
+                audioEl.currentTime = Math.min(settings.position, audioEl.duration || settings.position);
+              }
+              // Set lagi posisinya biar sinkron
+              set({ position: settings.position || 0 });
               audioEl?.removeEventListener('loadedmetadata', onLoaded);
             };
             audioEl.addEventListener('loadedmetadata', onLoaded);
@@ -267,7 +280,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       }
     }
   },
-
   _handleRemoteSync: (remote) => {
     const state = get();
     if (state.syncMode === 'off') return;
