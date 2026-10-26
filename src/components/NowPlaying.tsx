@@ -50,6 +50,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   const [menuTrack, setMenuTrack] = useState<{ id: string } | null>(null);
   const [lastTap, setLastTap] = useState(0);
   const [gameOpen, setGameOpen] = useState(false);
+  const [syncMenuOpen, setSyncMenuOpen] = useState(false);
 
   // Dynamic Theme
   useEffect(() => {
@@ -228,11 +229,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${radioMode ? 'text-accent' : 'text-white'}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
               <Radio className="w-4 h-4" /> Radio
             </button>
-            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => { 
-              const nextMode = syncMode === 'off' ? 'host' : syncMode === 'host' ? 'receiver' : syncMode === 'receiver' ? 'remote' : 'off';
-              setSyncMode(nextMode); 
-              pushToast(`Mode: ${nextMode.toUpperCase()}`); 
-            }}>
+            <button className={`tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 ${syncMode !== 'off' ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => setSyncMenuOpen(true)}>
               <Cast className="w-4 h-4" /> {syncMode === 'off' ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'receiver' ? 'Speaker' : 'Remote'}
             </button>
             <button className="tap glass-pill px-4 py-2.5 text-sm flex items-center gap-2 text-white" onClick={() => setGameOpen(true)}>
@@ -267,6 +264,24 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
       </BottomSheet>
 
       {gameOpen && <GuessTheSong onClose={() => setGameOpen(false)} />}
+
+      <BottomSheet open={syncMenuOpen} onClose={() => setSyncMenuOpen(false)} title="Pilih Mode Sync">
+        <div className="space-y-1 pb-4">
+          <button onClick={() => { setSyncMode('off'); setSyncMenuOpen(false); pushToast('Sync Dimatikan'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'off' ? 'text-accent font-bold' : 'text-white'}`}>
+            Off (Hanya Device Ini)
+          </button>
+          <button onClick={() => { setSyncMode('host'); setSyncMenuOpen(false); pushToast('Mode Host Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'host' ? 'text-accent font-bold' : 'text-white'}`}>
+            Host (Putar & Kontrol)
+          </button>
+          <button onClick={() => { setSyncMode('receiver'); setSyncMenuOpen(false); pushToast('Mode Speaker Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'receiver' ? 'text-accent font-bold' : 'text-white'}`}>
+            Speaker (Putar Bareng Host)
+          </button>
+          <button onClick={() => { setSyncMode('remote'); setSyncMenuOpen(false); pushToast('Mode Remote Aktif'); }} className={`w-full text-left px-4 py-3 text-sm tap rounded-xl hover:bg-white/5 ${syncMode === 'remote' ? 'text-accent font-bold' : 'text-white'}`}>
+            Remote (Hanya Kontrol, Bisu)
+          </button>
+        </div>
+      </BottomSheet>
+      
     </div>
   );
 }
