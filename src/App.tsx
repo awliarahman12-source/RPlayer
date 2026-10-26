@@ -16,6 +16,8 @@ import { SettingsPage } from '@/pages/Settings';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { getSettings } from '@/lib/db';
+import { useAuth } from '@/store/auth';
+import { LoginPage } from '@/pages/Login';
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -79,6 +81,15 @@ export default function App() {
   }, []);
 
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   return (
     <HashRouter>
