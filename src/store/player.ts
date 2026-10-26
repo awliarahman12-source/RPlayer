@@ -57,6 +57,7 @@ interface PlayerState {
   _restore: (settings: PlayerSettings) => Promise<void>;
   _handleRemoteSync: (remote: SyncPlaybackState) => void;
   _forceSyncWithHost: () => Promise<void>;
+  _handleRoleChange: (role: SyncMode) => void;
 }
 
 let audioEl: HTMLAudioElement | null = null;
@@ -95,14 +96,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   setSyncMode: (mode) => {
     if (!mode) return;
     const deviceId = usePresence.getState().deviceId;
-    set({ syncMode: mode, hostId: mode === 'host' ? deviceId : get().hostId });
     
+    // Panggil handleRoleChange biar volume & state-nya beres
+    get()._handleRoleChange(mode); 
+    
+    set({ hostId: mode === 'host' ? deviceId : get().hostId });
     void usePresence.getState().updateMyRole(mode);
-    
     pushSyncState(get, true);
-    if (mode === 'remote') {
-      void get()._forceSyncWithHost();
-    }
   },
 
   playTrack: async (trackId, contextIds) => {
@@ -307,6 +307,23 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       if (remote) get()._handleRemoteSync(remote);
     } catch (e) {
       console.error("Gagal force sync", e);
+    }
+  },
+
+  _handleRoleChange: (role) => {
+    const state = get();
+    if (state.syncMode === role) return;
+    
+    set({ syncMode: role });
+    
+    // Atur volume otomatis
+    if (audioEl) {
+      audioEl.volume = role === 'remote' ? 0 : state.volume * state.volumeBoost;
+    }
+    
+    // Kalau turun jadi remote, langsung tarik data dari host baru
+    if (role === 'remote') {
+      void get()._forceSyncWithHost();
     }
   },
 
