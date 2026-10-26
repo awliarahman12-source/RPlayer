@@ -30,7 +30,7 @@ function AnimatedRoutes() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.2 }}
-        className="h-full"
+        className="min-h-full" // FIX: Ganti h-full jadi min-h-full biar bisa scroll lebih panjang
       >
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
@@ -58,12 +58,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Pasang audio element ke player DULU, biar lagu bisa muter
     if (audioRef.current) {
       usePlayer.getState()._attach(audioRef.current);
     }
 
-    // Baru tarik data library & settingan
     void load().then(async () => {
       try {
         const settings = user ? await getSettingsFromCloud(user) : null;
@@ -74,7 +72,7 @@ export default function App() {
     });
 
     return () => usePlayer.getState()._detach();
-  }, [load, user]); // Tambahin user di dependency array
+  }, [load, user]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -102,7 +100,6 @@ export default function App() {
       ) : (
         <>
           <AmbientBackground />
-          {/* Pastikan crossOrigin tetap ada biar audio dari R2 bisa jalan */}
           <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
           <DynamicIsland />
 
@@ -112,7 +109,8 @@ export default function App() {
               <div 
                 className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-36 overflow-y-auto scroll-hidden transform-gpu" 
                 style={{
-                  paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 220px)' : 'calc(env(safe-area-inset-bottom) + 120px)',
+                  // FIX: Padding bottom kita gedein jadi 260px biar item terakhir aman
+                  paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 260px)' : 'calc(env(safe-area-inset-bottom) + 140px)',
                 }}
               >
                 <AnimatedRoutes />
