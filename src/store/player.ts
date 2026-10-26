@@ -309,7 +309,8 @@ async function loadAndPlay(track: Track, set: any, get: any) {
   set({ currentTrack: track, position: 0, duration: track.duration || 0, error: null });
   if (!audioEl) return;
   try {
-    const url = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    // Pakai URL dari R2, kalau nggak ada baru fallback ke lokal     
+    const url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
     if (!url) { set({ error: 'File tidak ditemukan' }); setTimeout(() => void get().next(), 800); return; }
     if (get().currentTrack?.id !== track.id) return;
     audioEl.src = url;
