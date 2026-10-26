@@ -49,6 +49,7 @@ export default function App() {
   const load = useLibrary((s) => s.load);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     const handleClick = () => { if (navigator.vibrate) navigator.vibrate(10); };
@@ -57,13 +58,23 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Pasang audio element ke player DULU, biar lagu bisa muter
+    if (audioRef.current) {
+      usePlayer.getState()._attach(audioRef.current);
+    }
+
+    // Baru tarik data library & settingan
     void load().then(async () => {
-      const settings = await getSettingsFromCloud(); // Ambil dari cloud
-      if (audioRef.current) usePlayer.getState()._attach(audioRef.current);
-      if (settings) await usePlayer.getState()._restore(settings);
+      try {
+        const settings = user ? await getSettingsFromCloud(user) : null;
+        if (settings) await usePlayer.getState()._restore(settings);
+      } catch (err) {
+        console.error("Gagal narik settingan cloud:", err);
+      }
     });
+
     return () => usePlayer.getState()._detach();
-  }, []);
+  }, [load, user]); // Tambahin user di dependency array
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -81,11 +92,6 @@ export default function App() {
   }, []);
 
   const hasCurrent = usePlayer((s) => !!s.currentTrack);
-  const { user, loading: authLoading } = useAuth();
-
-  useEffect(() => {
-    if (user) { void load(); }
-  }, [user, load]);
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
 
@@ -96,16 +102,17 @@ export default function App() {
       ) : (
         <>
           <AmbientBackground />
+          {/* Pastikan crossOrigin tetap ada biar audio dari R2 bisa jalan */}
           <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
           <DynamicIsland />
 
-          <div className="h-[100dvh] overflow-hidden flex transform-gpu"> {/* transform-gpu buat fix iOS blank */}
+          <div className="h-[100dvh] overflow-hidden flex transform-gpu">
             <div className="hidden lg:block w-[280px] shrink-0 p-3 pr-0 h-full"><Sidebar /></div>
             <main className="flex-1 min-w-0 flex h-full">
               <div 
                 className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-36 overflow-y-auto scroll-hidden transform-gpu" 
                 style={{
-                  paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 220px)' : 'calc(env(safe-area-inset-bottom) + 120px)', // Padding digedein biar nggak kehalang
+                  paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 220px)' : 'calc(env(safe-area-inset-bottom) + 120px)',
                 }}
               >
                 <AnimatedRoutes />
