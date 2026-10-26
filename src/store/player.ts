@@ -97,7 +97,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (!mode) return;
     const deviceId = usePresence.getState().deviceId;
     
-    // Panggil handleRoleChange biar volume & state-nya beres
     get()._handleRoleChange(mode); 
     
     set({ hostId: mode === 'host' ? deviceId : get().hostId });
@@ -204,22 +203,33 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     persist(get);
   },
 
-  toggleShuffle: () => { if (get().syncMode === 'speaker') return; set((s) => ({ shuffle: !s.shuffle })); persist(get); },
-  cycleRepeat: () => { if (get().syncMode === 'speaker') return; set((s) => { const nextMode: RepeatMode = s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off'; return { repeat: nextMode }; }); persist(get); },
-  playNext: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [trackId, ...s.queue] })); },
-  addToQueue: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [...s.queue, trackId] })); },
-  removeFromQueue: (index) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })); },
-  clearQueue: () => { if (get().syncMode === 'speaker') return; set({ queue: [] }); },
-  toggleRadioMode: () => { if (get().syncMode === 'speaker') return; set((s) => ({ radioMode: !s.radioMode })); persist(get); },
+  toggleShuffle: () => { 
+    if (get().syncMode === 'speaker') return; 
+    set((s) => ({ shuffle: !s.shuffle })); 
+    persist(get); 
+    pushSyncState(get); 
+  },
+  cycleRepeat: () => { 
+    if (get().syncMode === 'speaker') return; 
+    set((s) => { const nextMode: RepeatMode = s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off'; return { repeat: nextMode }; }); 
+    persist(get); 
+    pushSyncState(get); 
+  },
+  playNext: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [trackId, ...s.queue] })); pushSyncState(get); },
+  addToQueue: (trackId) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: [...s.queue, trackId] })); pushSyncState(get); },
+  removeFromQueue: (index) => { if (get().syncMode === 'speaker') return; set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })); pushSyncState(get); },
+  clearQueue: () => { if (get().syncMode === 'speaker') return; set({ queue: [] }); pushSyncState(get); },
+  toggleRadioMode: () => { if (get().syncMode === 'speaker') return; set((s) => ({ radioMode: !s.radioMode })); persist(get); pushSyncState(get); },
   setSleepTimer: (minutes) => {
     if (get().syncMode === 'speaker') return;
     const end = minutes ? Date.now() + minutes * 60 * 1000 : null;
     set({ sleepTimerEnd: end });
     persist(get);
+    pushSyncState(get);
   },
-  toggleCrossfade: () => { if (get().syncMode === 'speaker') return; set((s) => ({ crossfade: !s.crossfade })); persist(get); },
-  setPlaybackRate: (rate) => { if (get().syncMode === 'speaker') return; if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); },
-  setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); },
+  toggleCrossfade: () => { if (get().syncMode === 'speaker') return; set((s) => ({ crossfade: !s.crossfade })); persist(get); pushSyncState(get); },
+  setPlaybackRate: (rate) => { if (get().syncMode === 'speaker') return; if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); pushSyncState(get); },
+  setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); pushSyncState(get); },
 
   _onTimeUpdate: () => {
     if (!audioEl) return;
@@ -316,15 +326,11 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     
     set({ syncMode: role });
     
-    // Atur volume otomatis
     if (audioEl) {
       audioEl.volume = role === 'remote' ? 0 : state.volume * state.volumeBoost;
     }
     
-    // Kalau turun jadi remote, langsung tarik data dari host baru
-    if (role === 'remote') {
-      void get()._forceSyncWithHost();
-    }
+    void get()._forceSyncWithHost();
   },
 
   _handleRemoteSync: (remote) => {
@@ -336,7 +342,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     const isSpeaker = state.syncMode === 'speaker';
     const isRemote = state.syncMode === 'remote';
 
-    set({ hostId: remote.hostId });
+    set({ 
+      hostId: remote.hostId,
+      repeat: remote.repeat !== undefined ? remote.repeat : state.repeat,
+      shuffle: remote.shuffle !== undefined ? remote.shuffle : state.shuffle,
+      queue: remote.queue !== undefined ? remote.queue : state.queue,
+    });
 
     if (audioEl) {
       if (isRemote) audioEl.volume = 0;
@@ -466,6 +477,9 @@ function pushSyncState(get: () => PlayerState, force = false) {
     position: audioEl?.currentTime || 0,
     updatedAt: Date.now(),
     originMode: state.syncMode,
+    repeat: state.repeat,
+    shuffle: state.shuffle,
+    queue: state.queue,
   });
 }
 

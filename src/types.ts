@@ -1,17 +1,34 @@
-// Tambahkan di bagian paling atas file
+export type SyncMode = 'host' | 'remote' | 'speaker';
+
 export interface ActiveDevice {
   deviceId: string;
   deviceType: 'mobile' | 'desktop';
+  role: SyncMode;
   lastActive: number;
+  joinedAt: number; // <-- Tambahan
 }
 
 export interface SyncPlaybackState {
   deviceId: string;
-  hostId: string; // Device yang jadi Host utama
+  hostId: string;
   trackId: string | null;
   isPlaying: boolean;
   position: number;
   updatedAt: number;
+  originMode?: SyncMode; 
+}
+
+export interface SyncPlaybackState {
+  deviceId: string;
+  hostId: string;
+  trackId: string | null;
+  isPlaying: boolean;
+  position: number;
+  updatedAt: number;
+  originMode?: SyncMode;
+  repeat?: 'off' | 'all' | 'one';
+  shuffle?: boolean;
+  queue?: string[];
 }
 
 export interface Track {
@@ -19,16 +36,16 @@ export interface Track {
   title: string;
   artist: string;
   album?: string;
-  duration: number; // seconds
-  coverDataUrl?: string; // base64 cover art
+  duration: number;
+  coverDataUrl?: string;
   fileName: string;
   mimeType: string;
   size: number;
-  addedAt: number; // timestamp
+  addedAt: number;
   lastPlayedAt?: number;
   liked: boolean;
   likedAt?: number;
-  audioUrl?: string; // URL MP3 dari R2 (Cuma butuh satu)
+  audioUrl?: string;
   playCount?: number;
   isDownloaded?: boolean; 
   genre?: string;
@@ -42,7 +59,7 @@ export interface Playlist {
   createdAt: number;
   trackIds: string[];
   coverDataUrl?: string;
-  parentId?: string | null; // Cuma butuh satu
+  parentId?: string | null;
   description?: string;
 }
 
@@ -50,7 +67,7 @@ export interface PartyQueueItem {
   trackId: string;
   requestedBy: string;
   addedAt: number;
-  votes?: number; // <-- Tambahan buat Voting
+  votes?: number;
 }
 
 export interface PartyRoom {
@@ -68,7 +85,7 @@ export interface PlayerSettings {
   shuffle: boolean;
   repeat: RepeatMode;
   currentTrackId: string | null;
-  position: number; // seconds
+  position: number;
   queue: string[];
   sleepTimerEnd?: number | null;
   crossfade?: boolean;
