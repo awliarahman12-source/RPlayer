@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image } from 'lucide-react';
+import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image, FileText } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
@@ -22,6 +22,7 @@ export function PlaylistDetailPage() {
   const removePlaylist = useLibrary((s) => s.removePlaylist);
   const reorderPlaylistTracks = useLibrary((s) => s.reorderPlaylistTracks);
   const updatePlaylistCover = useLibrary((s) => s.updatePlaylistCover);
+  const updatePlaylistNotes = useLibrary((s) => s.updatePlaylistNotes); // FIX: Tambahin ini
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
@@ -160,15 +161,13 @@ export function PlaylistDetailPage() {
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={name}>
         <div className="space-y-1">
-          <div className="text-sm text-white/50 mt-2">{playlistTracks.length} lagu · {formatDuration(totalDuration)}</div>
-          {playlist?.description && <p className="text-sm text-white/40 italic mt-1">"{playlist.description}"</p>}
+          <SheetItem icon={<Pencil className="w-5 h-5" />} label="Ganti nama" onClick={() => { setNameInput(name); setRenaming(true); setMenuOpen(false); }} />
           <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
           <SheetItem icon={<FileText className="w-5 h-5" />} label="Edit Notes" onClick={() => { 
             const notes = prompt("Tulis catatan buat playlist ini:", playlist?.description || '');
             if (notes !== null && playlist) updatePlaylistNotes(playlist.id, notes);
             setMenuOpen(false);
           }} />
-          <SheetItem icon={<Image className="w-5 h-5" />} label="Ganti Cover" onClick={() => { setCoverOpen(true); setMenuOpen(false); }} />
           <SheetItem icon={<Plus className="w-5 h-5" />} label="Tambah lagu" onClick={() => { setMenuOpen(false); navigate('/library'); pushToast('Cari lagu lalu pakai menu "Tambahkan ke playlist"'); }} />
           <div className="h-px bg-white/10 my-1" />
           <SheetItem icon={<Trash2 className="w-5 h-5" />} label="Hapus playlist" danger onClick={() => {
