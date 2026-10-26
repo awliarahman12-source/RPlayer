@@ -73,6 +73,14 @@ export const usePresence = create<PresenceState>((set, get) => ({
         .map(d => d.data() as ActiveDevice)
         .filter(d => now - d.lastActive < 60000);
       set({ devices: active });
+
+      // --- TAMBAHAN PENTING ---
+      // Cek apakah role device kita di database berubah (misal diturunin jadi Remote)
+      const myDbDevice = active.find(d => d.deviceId === myDeviceId);
+      if (myDbDevice && usePlayer.getState().syncMode !== myDbDevice.role) {
+        // Panggil _handleRoleChange biar UI, volume, dan sinkronisasinya langsung nyesuaiin
+        usePlayer.getState()._handleRoleChange(myDbDevice.role);
+      }
     });
 
     return () => {
