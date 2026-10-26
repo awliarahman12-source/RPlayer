@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import type { Track, Playlist } from '@/types';
 import { usePlayer } from './player';
 import { useAuth } from './auth';
-import * as fs from '@/lib/firestore'; // Firestore Helper
-import * as db from '@/lib/db'; // Masih dipakai buat cache lokal
+import * as fs from '@/lib/firestore';
+import * as db from '@/lib/db';
 import { useNotification } from './notification';
 
 interface LibraryState {
@@ -37,7 +37,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const user = useAuth.getState().user;
     if (!user) return;
     
-    // Ambil dari Firestore
     const [tracks, playlists] = await Promise.all([
       fs.getTracksFromCloud(user),
       fs.getPlaylistsFromCloud(user)
@@ -61,7 +60,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       const newTracks: Track[] = [];
       for (const file of valid) {
         try {
-          notify.startUpload(file.name); // Munculin Dynamic Island
+          notify.startUpload(file.name);
           
           const track = await fileToTrack(file);
           
@@ -75,16 +74,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           if (!res.ok) throw new Error('Gagal konek ke API Vercel');
           const { uploadUrl, publicUrl } = await res.json();
 
-          // 2. Upload MP3 ke R2 pakai XMLHttpRequest (biar progress bar akurat)
+          // 2. Upload MP3 ke R2 (TANPA HEADER CONTENT-TYPE BIAR LOLOS CORS)
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', file.type);
+            // xhr.setRequestHeader('Content-Type', file.type); <--- SUDAH DIHAPUS
             
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {
                 const percent = (event.loaded / event.total) * 100;
-                notify.updateProgress(percent); // Update progress di Dynamic Island
+                notify.updateProgress(percent);
               }
             };
             
@@ -96,17 +95,17 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             xhr.send(file);
           });
 
-          track.audioUrl = publicUrl; // Simpan URL R2
+          track.audioUrl = publicUrl;
           
           // 3. Simpan ke Firestore
           await fs.saveTrackToCloud(user, track);
           newTracks.push(track);
           
-          notify.endUpload(true); // Sukses
+          notify.endUpload(true);
           
         } catch (e) {
           console.error('Failed to import', file.name, e);
-          notify.endUpload(false); // Gagal
+          notify.endUpload(false);
         }
       }
       
@@ -191,7 +190,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   removePlaylist: async (id) => {
     const user = useAuth.getState().user;
-    if (user) await fs.deleteDoc(doc(db, 'users', user, 'playlists', id)); // Perlu import doc & db
+    if (user) await fs.deletePlaylistFromCloud(user, id);
     set((s) => ({ playlists: s.playlists.filter((x) => x.id !== id) }));
   },
 
