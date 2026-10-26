@@ -162,6 +162,11 @@ export function PlaylistDetailPage() {
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={name}>
         <div className="space-y-1">
           <SheetItem 
+            icon={<Pencil className="w-5 h-5" />} 
+            label="Ganti nama" 
+            onClick={() => { setNameInput(name); setRenaming(true); setMenuOpen(false); }} 
+          />
+          <SheetItem 
             icon={<Share2 className="w-5 h-5" />} 
             label="Share Playlist" 
             onClick={() => { 
