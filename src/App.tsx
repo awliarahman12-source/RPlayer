@@ -102,7 +102,7 @@ export default function App() {
       ) : (
         <>
           <AmbientBackground />
-          <audio ref={audioRef} preload="auto" />
+          <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
           <DynamicIsland />
 
       {/* 1. Kunci tinggi layar utama (h-[100dvh] & overflow-hidden) */}
