@@ -41,6 +41,10 @@ export const usePresence = create<PresenceState>((set, get) => ({
 
         let myRole: SyncMode = 'speaker';
 
+        // LOGIKA BARU: 
+        // 1. Kalau nggak ada Host, jadi Host
+        // 2. Kalau Host udah ada tapi Remote belum ada, jadi Remote
+        // 3. Kalau dua-duanya udah ada, jadi Speaker
         if (!currentHost) {
           myRole = 'host';
         } else if (!currentRemote) {
