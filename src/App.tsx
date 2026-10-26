@@ -87,15 +87,17 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
   }
 
-  if (!user) {
-    return <LoginPage />;
-  }
-
   return (
     <HashRouter>
-      <AmbientBackground />
-      <audio ref={audioRef} preload="auto" />
-      <ToastHost />
+      {!user ? (
+        <Routes>
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      ) : (
+        <>
+          <AmbientBackground />
+          <audio ref={audioRef} preload="auto" />
+          <ToastHost />
 
       {/* 1. Kunci tinggi layar utama (h-[100dvh] & overflow-hidden) */}
       <div className="h-[100dvh] overflow-hidden flex">
@@ -131,7 +133,9 @@ export default function App() {
       </div>
 
       <div className="hidden lg:block"><PlayerBar onExpand={() => setNowOpen(true)} /></div>
-      <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="mobile" />
+          <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="mobile" />
+        </>
+      )}
     </HashRouter>
   );
 }
