@@ -35,9 +35,9 @@ export function LibraryPage() {
         <UploadButton className="lg:hidden" />
       </div>
 
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 -mx-4 px-4 py-3 bg-[#0b0b0f]/80 backdrop-blur-md mb-4">
-        <div className="glass-pill p-1 inline-flex mb-3 text-sm">
+      {/* Floating Sticky Header */}
+      <div className="sticky top-2 z-20 flex justify-between items-center mb-4 pointer-events-none">
+        <div className="glass-pill p-1 inline-flex text-sm pointer-events-auto">
           <button className={`px-4 py-1.5 rounded-full tap ${tab === 'tracks' ? 'glass-strong' : 'text-white/60'}`} onClick={() => setTab('tracks')}>Lagu</button>
           <button className={`px-4 py-1.5 rounded-full tap ${tab === 'playlists' ? 'glass-strong' : 'text-white/60'}`} onClick={() => setTab('playlists')}>Playlist</button>
         </div>
@@ -52,9 +52,7 @@ export function LibraryPage() {
 
           {loading ? (
              <div className="space-y-1">
-               <SkeletonRow />
-               <SkeletonRow />
-               <SkeletonRow />
+               <SkeletonRow /><SkeletonRow /><SkeletonRow />
              </div>
           ) : tracks.length === 0 ? (
             <div className="text-center text-white/40 py-16 flex flex-col items-center">
