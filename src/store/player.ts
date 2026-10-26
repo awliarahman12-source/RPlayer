@@ -109,10 +109,30 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   togglePlay: () => {
     if (!audioEl || !get().currentTrack) return;
+    
     if (audioEl.paused) {
-      void audioEl.play().catch(() => {});
+      const playPromise = audioEl.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            set({ isPlaying: true }); // Baru ubah ke Pause kalau sukses
+            updateMediaSession(get);
+          })
+          .catch((error) => {
+            console.warn("Gagal memutar (mungkin koneksi/ISP diblokir):", error);
+            set({ isPlaying: false });
+            
+            // Panggil notifikasi
+            import('./notification').then((mod) => {
+              mod.useNotification.getState().show('Gagal memutar. Koneksi terblokir atau file rusak.', 'error');
+            });
+          });
+      }
     } else {
       audioEl.pause();
+      set({ isPlaying: false });
+      updateMediaSession(get);
     }
   },
 
