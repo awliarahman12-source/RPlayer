@@ -50,8 +50,12 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         fs.getPlaylistsFromCloud(user)
       ]);
       set({ tracks, playlists, loading: false });
-    } catch (error) {
-      console.error("Gagal narik data dari Firestore (cek Rules/AdBlocker):", error);
+    } catch (error: any) {
+      console.error("Gagal narik data:", error);
+      // MUNCULIN NOTIFIKASI MERAH DI LAYAR
+      import('./notification').then((mod) => {
+        mod.useNotification.getState().show(`Gagal load: ${error.message || 'Koneksi diblokir'}`, 'error');
+      });
       set({ loading: false });
     }
   },
