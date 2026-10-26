@@ -39,14 +39,21 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   load: async () => {
     const user = useAuth.getState().user;
-    if (!user) return;
+    if (!user) {
+      set({ loading: false });
+      return;
+    }
     
-    const [tracks, playlists] = await Promise.all([
-      fs.getTracksFromCloud(user),
-      fs.getPlaylistsFromCloud(user)
-    ]);
-    
-    set({ tracks, playlists, loading: false });
+    try {
+      const [tracks, playlists] = await Promise.all([
+        fs.getTracksFromCloud(user),
+        fs.getPlaylistsFromCloud(user)
+      ]);
+      set({ tracks, playlists, loading: false });
+    } catch (error) {
+      console.error("Gagal narik data dari Firestore (cek Rules/AdBlocker):", error);
+      set({ loading: false });
+    }
   },
 
   addFiles: async (files) => {
@@ -180,14 +187,10 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     if (!user) return;
     
     try {
-      // Fetch file dari R2/Jamendo
       const res = await fetch(track.audioUrl);
       const blob = await res.blob();
-      
-      // Simpan ke IndexedDB lokal
       await db.saveAudioBlob(track.id, blob);
       
-      // Update status di state & database
       const updated = { ...track, isDownloaded: true };
       await fs.saveTrackToCloud(user, updated);
       set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? updated : t)) }));
