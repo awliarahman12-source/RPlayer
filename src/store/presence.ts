@@ -41,10 +41,7 @@ export const usePresence = create<PresenceState>((set, get) => ({
 
         let myRole: SyncMode = 'speaker';
 
-        // LOGIKA BARU: 
-        // 1. Kalau nggak ada Host, jadi Host
-        // 2. Kalau Host udah ada tapi Remote belum ada, jadi Remote
-        // 3. Kalau dua-duanya udah ada, jadi Speaker
+        // --- LOGIKA AUTO ASSIGN ---
         if (!currentHost) {
           myRole = 'host';
         } else if (!currentRemote) {
@@ -74,6 +71,7 @@ export const usePresence = create<PresenceState>((set, get) => ({
       void setDoc(deviceRef, { lastActive: Date.now() }, { merge: true });
     }, 15000);
 
+    // Listener buat mantau device lain & auto-promote
     const unsub = onSnapshot(collection(db, 'users', user, 'active_devices'), (snap) => {
       const now = Date.now();
       const active = snap.docs
@@ -83,23 +81,22 @@ export const usePresence = create<PresenceState>((set, get) => ({
       const myDbDevice = active.find(d => d.deviceId === myDeviceId);
 
       if (myDbDevice) {
+        // --- LOGIKA AUTO-PROMOTE ---
         const hasHost = active.some(d => d.role === 'host');
         const hasRemote = active.some(d => d.role === 'remote');
 
         if (!hasHost && active.length > 0) {
-          // Kalau nggak ada Host, Remote naik jadi Host. Kalau nggak ada Remote, Speaker tertua naik jadi Host.
+          // Host mati, cari Remote atau Speaker tertua buat naik
           const remote = active.find(d => d.role === 'remote');
           const oldestSpeaker = [...active].filter(d => d.role === 'speaker').sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))[0];
 
-          if (remote && remote.deviceId === myDeviceId) {
-            void updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
-            usePlayer.getState().setSyncMode('host');
-          } else if (!remote && oldestSpeaker && oldestSpeaker.deviceId === myDeviceId) {
+          const candidate = remote || oldestSpeaker;
+          if (candidate && candidate.deviceId === myDeviceId) {
             void updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
             usePlayer.getState().setSyncMode('host');
           }
         } else if (!hasRemote && active.length > 1) {
-          // Kalau nggak ada Remote, Speaker tertua naik jadi Remote
+          // Remote mati, cari Speaker tertua buat naik
           const oldestSpeaker = [...active].filter(d => d.role === 'speaker').sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))[0];
           if (oldestSpeaker && oldestSpeaker.deviceId === myDeviceId) {
             void updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'remote' });
@@ -132,50 +129,39 @@ export const usePresence = create<PresenceState>((set, get) => ({
     if (!myDevice) return;
 
     if (newRole === 'host') {
+      // Siapapun bisa jadi Host. Host lama turun jadi Remote (kalo remote ada, jadi Speaker)
       const currentHost = devices.find(d => d.role === 'host');
       const currentRemote = devices.find(d => d.role === 'remote');
 
-      if (myDevice.role === 'remote') {
-        // Tukar posisi Host <-> Remote
-        if (currentHost) {
-          await updateDoc(doc(db, 'users', user, 'active_devices', currentHost.deviceId), { role: 'remote' });
-        }
-        await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
-      } else if (myDevice.role === 'speaker') {
-        if (currentHost && currentRemote) {
-          useNotification.getState().show('Hanya Remote yang bisa menjadi Host', 'error');
-          return;
-        }
-        await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
+      if (currentHost && currentHost.deviceId !== myDeviceId) {
+        // Host lama turun jadi Speaker (biar aman)
+        await updateDoc(doc(db, 'users', user, 'active_devices', currentHost.deviceId), { role: 'speaker' });
       }
+
+      // Kalau aku dulu Speaker dan Remote masih ada, jadikan aku Host, Remote tetep
+      await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
+
     } else if (newRole === 'remote') {
-      if (myDevice.role === 'host') {
-        const currentRemote = devices.find(d => d.role === 'remote');
-        if (currentRemote) {
-          await updateDoc(doc(db, 'users', user, 'active_devices', currentRemote.deviceId), { role: 'host' });
-        }
+      // Cuma boleh 1 Remote. Kalau ada Remote lama, dia jadi Host (tukar posisi)
+      const currentRemote = devices.find(d => d.role === 'remote');
+      const currentHost = devices.find(d => d.role === 'host');
+
+      if (currentRemote && currentRemote.deviceId !== myDeviceId) {
+        // Remote lama naik jadi Host, aku jadi Remote
+        await updateDoc(doc(db, 'users', user, 'active_devices', currentRemote.deviceId), { role: 'host' });
         await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'remote' });
-      } else if (myDevice.role === 'speaker') {
-        const currentRemote = devices.find(d => d.role === 'remote');
-        if (currentRemote) {
-          useNotification.getState().show('Remote sudah ada', 'error');
-          return;
-        }
+      } else {
+        // Kalau belum ada remote, Host turun jadi speaker dan aku jadi Remote?
+        // Lebih aman: Host tetep, aku jadi Remote
         await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'remote' });
+        if (currentHost && currentHost.deviceId === myDeviceId) {
+          // Kalau aku tadinya Host, aku turun jadi Remote, Host lama kosong? Harusnya ada Host lain
+          // Kalau nggak ada, otomatis nanti ada yang naik
+        }
       }
     } else if (newRole === 'speaker') {
-      if (myDevice.role === 'host') {
-        const currentRemote = devices.find(d => d.role === 'remote');
-        if (currentRemote) {
-          await updateDoc(doc(db, 'users', user, 'active_devices', currentRemote.deviceId), { role: 'host' });
-        } else {
-          useNotification.getState().show('Harus ada minimal 1 Host', 'error');
-          return;
-        }
-        await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'speaker' });
-      } else if (myDevice.role === 'remote') {
-        await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'speaker' });
-      }
+      await updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'speaker' });
+      // Host tetep, Remote tetep
     }
   }
 }));
