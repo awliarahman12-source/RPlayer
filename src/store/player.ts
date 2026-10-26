@@ -317,8 +317,15 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         set({ currentTrack: track });
         await updateAmbient(track, set);
         if (audioEl) {
-          // Kalau ada audioUrl dari R2, pakai itu. Kalau nggak ada, fallback ke IndexedDB lokal
-    const url = fixUrl(track.audioUrl) || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+          // Pakai URL dari R2, kalau nggak ada baru fallback ke lokal
+          let url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+
+          // Trik buat ngubah URL lama r2.dev ke URL Worker
+          if (url && url.includes('.r2.dev')) {
+            const workerUrl = "https://r2-proxy.awliarahman12-ca2.workers.dev";
+            const path = new URL(url).pathname;
+            url = `${workerUrl}${path}`;
+          }
           if (url && audioEl) {
             audioEl.src = url;
             audioEl.load();
@@ -342,7 +349,14 @@ async function loadAndPlay(track: Track, set: any, get: any) {
   if (!audioEl) return;
   try {
     // Pakai URL dari R2, kalau nggak ada baru fallback ke lokal     
-    const url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    let url = track.audioUrl || await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+
+    // Trik buat ngubah URL lama r2.dev ke URL Worker
+    if (url && url.includes('.r2.dev')) {
+      const workerUrl = "https://r2-proxy.awliarahman12-ca2.workers.dev";
+      const path = new URL(url).pathname;
+      url = `${workerUrl}${path}`;
+    }
     if (!url) { set({ error: 'File tidak ditemukan' }); setTimeout(() => void get().next(), 800); return; }
     if (get().currentTrack?.id !== track.id) return;
     audioEl.src = url;
