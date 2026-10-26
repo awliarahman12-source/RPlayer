@@ -21,6 +21,7 @@ import { usePresence } from '@/store/presence';
 import { useAuth } from '@/store/auth';
 import { LoginPage } from '@/pages/Login';
 import { PartyGuestPage } from '@/pages/PartyGuest';
+import { SharedPlaylistPage } from '@/pages/SharedPlaylist'; // Pastikan ini ada
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -32,7 +33,7 @@ function AnimatedRoutes() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.2 }}
-        className="min-h-full" // FIX: Ganti h-full jadi min-h-full biar bisa scroll lebih panjang
+        className="min-h-full"
       >
         <Routes location={location}>
           <Route path="/" element={<HomePage />} />
@@ -53,24 +54,46 @@ export default function App() {
   const [nowOpen, setNowOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
 
+  // 1. Efek buat Haptic Feedback
   useEffect(() => {
     const handleClick = () => { if (navigator.vibrate) navigator.vibrate(10); };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
+  // 2. Efek Utama: Attach Audio, Load Data, Restore Settings, & Sync Device
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSyncPlaybackChange(user, (state) => {
+    if (audioRef.current) {
+      usePlayer.getState()._attach(audioRef.current);
+    }
+
+    if (user) {
+      // Narik lagu & playlist dari Firebase
+      void load().then(async () => {
+        try {
+          const settings = await getSettingsFromCloud(user);
+          if (settings) await usePlayer.getState()._restore(settings);
+        } catch (err) {
+          console.error("Gagal restore settings:", err);
+        }
+      });
+    }
+
+    // Mulai dengerin device lain (Sync) & Presence
+    const unsub = user ? onSyncPlaybackChange(user, (state) => {
       usePlayer.getState()._handleRemoteSync(state);
-    });
-    const stopPresence = usePresence.getState().startPresence();
+    }) : () => {};
+
+    const stopPresence = user ? usePresence.getState().startPresence() : () => {};
+
     return () => {
+      usePlayer.getState()._detach();
       unsub();
       if (typeof stopPresence === 'function') stopPresence();
     };
-  }, [user]);
+  }, [user, load]);
 
+  // 3. Efek Keyboard Shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -90,7 +113,7 @@ export default function App() {
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
 
-  // CEK: Kalau URL-nya buat share playlist, tampilin halaman publik tanpa login
+  // Route khusus buat Share & Party (Tanpa Login)
   if (window.location.hash.startsWith('#/share/')) {
     return (
       <HashRouter>
@@ -127,7 +150,6 @@ export default function App() {
               <div 
                 className="flex-1 min-w-0 lg:py-3 lg:pr-3 lg:pb-36 overflow-y-auto scroll-hidden transform-gpu" 
                 style={{
-                  // FIX: Padding bottom kita gedein jadi 260px biar item terakhir aman
                   paddingBottom: hasCurrent ? 'calc(env(safe-area-inset-bottom) + 260px)' : 'calc(env(safe-area-inset-bottom) + 140px)',
                 }}
               >
