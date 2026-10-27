@@ -14,7 +14,8 @@ import { TrackMenuSheet } from './TrackMenuSheet';
 import { Visualizer } from './Visualizer';
 import { LyricsView } from './LyricsView';
 import { usePresence } from '@/store/presence';
-import { FullscreenPlayer } from './FullscreenPlayer'; // Pastikan ini ada
+import { FullscreenPlayer } from './FullscreenPlayer'; 
+// (Pastikan import ini ada) // Pastikan ini ada
 
 interface NowPlayingProps {
   open: boolean;
@@ -98,28 +99,25 @@ export function NowPlaying({ open, onClose, variant = 'mobile', showLyrics = fal
   if (variant === 'desktop') {
     return (
       <aside className="hidden lg:flex flex-col gap-4 p-4 h-full">
-        <div className="glass rounded-glass p-5 flex flex-col items-center text-center relative overflow-hidden h-full">
-          {showLyrics ? (
-            <div className="w-full h-full flex flex-col text-left">
-              <h2 className="text-lg font-bold mb-4 px-2">Lirik Lagu</h2>
-              <div className="flex-1 overflow-hidden">
-                <LyricsView trackId={track.id} />
-              </div>
+        <div className="glass rounded-glass p-4 flex flex-col items-center relative overflow-hidden h-full">
+          {/* Bagian Atas: Cover & Info */}
+          <div className="w-full flex flex-col items-center shrink-0 relative z-10 pb-4 border-b border-white/10">
+            <Visualizer />
+            <div className={`relative transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
+              <Cover src={track.coverDataUrl} alt={track.title} className="w-full aspect-square max-w-[200px] mb-4 shadow-2xl" rounded="xl" />
+              <div className="absolute inset-0 bg-accent/30 blur-3xl -z-10 rounded-full animate-pulse" />
             </div>
-          ) : (
-            <>
-              <Visualizer />
-              <div className={`relative transition-transform duration-700 z-10 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
-                <Cover src={track.coverDataUrl} alt={track.title} className="w-full aspect-square max-w-[260px] mb-5 shadow-2xl" rounded="xl" />
-                <div className="absolute inset-0 bg-accent/30 blur-3xl -z-10 rounded-full animate-pulse" />
-              </div>
-              <h2 className="text-xl font-bold truncate w-full z-10">{track.title}</h2>
-              <p className="text-white/60 truncate w-full text-sm mt-0.5 z-10">{track.artist}</p>
-              <div className="w-full mt-4 z-10">
-                <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
-              </div>
-            </>
-          )}
+            <h2 className="text-lg font-bold truncate w-full text-center">{track.title}</h2>
+            <p className="text-white/60 truncate w-full text-sm mt-0.5 text-center">{track.artist}</p>
+            <div className="w-full mt-3">
+              <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
+            </div>
+          </div>
+          
+          {/* Bagian Bawah: Lirik */}
+          <div className="w-full flex-1 overflow-hidden pt-2">
+            <LyricsView trackId={track.id} variant="desktop-panel" />
+          </div>
         </div>
         
         {queueOpen && (
