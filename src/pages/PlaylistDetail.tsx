@@ -4,6 +4,7 @@ import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Sear
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
+import { useAuth } from '@/store/auth'; // <-- TAMBAHAN: Import useAuth
 import { TrackRow } from '@/components/TrackRow';
 import { Cover } from '@/components/Cover';
 import { formatDuration } from '@/lib/format';
@@ -22,7 +23,7 @@ export function PlaylistDetailPage() {
   const removePlaylist = useLibrary((s) => s.removePlaylist);
   const reorderPlaylistTracks = useLibrary((s) => s.reorderPlaylistTracks);
   const updatePlaylistCover = useLibrary((s) => s.updatePlaylistCover);
-  const updatePlaylistNotes = useLibrary((s) => s.updatePlaylistNotes); // FIX: Tambahin ini
+  const updatePlaylistNotes = useLibrary((s) => s.updatePlaylistNotes);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
@@ -37,7 +38,7 @@ export function PlaylistDetailPage() {
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 15 } })
   );
 
   const isLiked = id === 'liked';
