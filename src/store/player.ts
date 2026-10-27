@@ -95,8 +95,32 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   setSyncMode: (mode) => {
     if (!mode) return;
-    const deviceId = usePresence.getState().deviceId;
     
+    // Validasi: Cek apakah role ini diizinkan
+    const devices = usePresence.getState().devices;
+    const myDeviceId = usePresence.getState().deviceId;
+    const myDevice = devices.find(d => d.deviceId === myDeviceId);
+    
+    if (myDevice) {
+      if (mode === 'host' && myDevice.role === 'speaker') {
+        const currentHost = devices.find(d => d.role === 'host');
+        const currentRemote = devices.find(d => d.role === 'remote');
+        if (currentHost && currentRemote) {
+          import('./notification').then((mod) => mod.useNotification.getState().show('Hanya Remote yang bisa menjadi Host!', 'error'));
+          return; // Batalkan
+        }
+      }
+      
+      if (mode === 'remote' && myDevice.role === 'speaker') {
+        const currentRemote = devices.find(d => d.role === 'remote');
+        if (currentRemote) {
+          import('./notification').then((mod) => mod.useNotification.getState().show('Slot Remote sudah terisi!', 'error'));
+          return; // Batalkan
+        }
+      }
+    }
+
+    const deviceId = usePresence.getState().deviceId;
     get()._handleRoleChange(mode); 
     
     set({ hostId: mode === 'host' ? deviceId : get().hostId });
