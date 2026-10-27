@@ -5,17 +5,18 @@ import { useToast } from '@/store/toast';
 import { Cover } from './Cover';
 import { Slider } from './Slider';
 import { PlayerControls, VolumeControl } from './PlayerControls';
-import { Heart, ChevronUp, Mic2, ListMusic, Gauge, Radio, Gamepad2, Cast } from 'lucide-react';
-import { BottomSheet } from './BottomSheet';
+import { Heart, ChevronUp, Mic2, Gauge, Radio, Gamepad2, Cast, Maximize2, X } from 'lucide-react';
 import { LyricsView } from './LyricsView';
 import { GuessTheSong } from './GuessTheSong';
 import { usePresence } from '@/store/presence';
+import { BottomSheet } from './BottomSheet'; // Tetap dipakai buat Lirik di mobile
 
 interface PlayerBarProps {
   onExpand: () => void;
+  onFullscreen: () => void;
 }
 
-export function PlayerBar({ onExpand }: PlayerBarProps) {
+export function PlayerBar({ onExpand, onFullscreen }: PlayerBarProps) {
   const track = usePlayer((s) => s.currentTrack);
   const position = usePlayer((s) => s.position);
   const duration = usePlayer((s) => s.duration);
@@ -30,7 +31,8 @@ export function PlayerBar({ onExpand }: PlayerBarProps) {
   const syncMode = usePlayer((s) => s.syncMode);
   const setSyncMode = usePlayer((s) => s.setSyncMode);
 
-  const [controlsOpen, setControlsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [syncSubMenu, setSyncSubMenu] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
 
@@ -65,41 +67,64 @@ export function PlayerBar({ onExpand }: PlayerBarProps) {
           </div>
 
           {/* right side */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 relative">
             <VolumeControl />
-            <button className="tap glass-pill w-10 h-10 flex items-center justify-center text-white/70 hover:text-white" onClick={() => setControlsOpen(true)} aria-label="More controls">
-              <ChevronUp className="w-5 h-5" />
-            </button>
+            
+            {/* Tombol Menu Popover */}
+            <div className="relative">
+              <button 
+                className="tap glass-pill w-10 h-10 flex items-center justify-center text-white/70 hover:text-white" 
+                onClick={() => { setMenuOpen(!menuOpen); setSyncSubMenu(false); }}
+              >
+                <ChevronUp className={`w-5 h-5 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Popover Menu */}
+              {menuOpen && (
+                <div className="absolute bottom-14 right-0 glass-strong rounded-2xl p-2 w-48 shadow-2xl animate-spring-up">
+                  {!syncSubMenu ? (
+                    <div className="space-y-1">
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); setLyricsOpen(true); }}>
+                        <Mic2 className="w-4 h-4" /> Lirik
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(next); pushToast(`Kecepatan: ${next}x`); }}>
+                        <Gauge className="w-4 h-4" /> Speed {playbackRate}x
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
+                        <Radio className="w-4 h-4" /> Radio {radioMode ? 'On' : 'Off'}
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => setSyncSubMenu(true)}>
+                        <Cast className="w-4 h-4" /> Sync Mode
+                      </button>
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); setGameOpen(true); }}>
+                        <Gamepad2 className="w-4 h-4" /> Game
+                      </button>
+                      <div className="h-px bg-white/10 my-1" />
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-accent hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); onFullscreen(); }}>
+                        <Maximize2 className="w-4 h-4" /> Full Screen
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <button className="w-full flex items-center gap-2 px-2 py-1 text-xs text-white/50 hover:text-white" onClick={() => setSyncSubMenu(false)}>
+                        <X className="w-3 h-3" /> Kembali
+                      </button>
+                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'host' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('host'); setMenuOpen(false); }}>Host</button>
+                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'remote' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('remote'); setMenuOpen(false); }}>Remote</button>
+                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'speaker' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('speaker'); setMenuOpen(false); }}>Speaker</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* BottomSheet buat Tombol Ekstra di Desktop */}
-      <BottomSheet open={controlsOpen} onClose={() => setControlsOpen(false)} title="Kontrol Pemutar">
-        <div className="grid grid-cols-2 gap-2 pb-6">
-          <button className={`glass-pill p-3 flex flex-col items-center gap-2 tap ${lyricsOpen ? 'text-accent' : 'text-white'}`} onClick={() => { setControlsOpen(false); setLyricsOpen(true); }}>
-            <Mic2 className="w-5 h-5" /> Lirik
-          </button>
-          <button className={`glass-pill p-3 flex flex-col items-center gap-2 tap ${playbackRate !== 1 ? 'text-accent' : 'text-white'}`} onClick={() => { const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(nextRate); pushToast(`Kecepatan: ${nextRate}x`); }}>
-            <Gauge className="w-5 h-5" /> {playbackRate}x Speed
-          </button>
-          <button className={`glass-pill p-3 flex flex-col items-center gap-2 tap ${radioMode ? 'text-accent' : 'text-white'}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
-            <Radio className="w-5 h-5" /> Radio
-          </button>
-          <button className={`glass-pill p-3 flex flex-col items-center gap-2 tap ${syncMode ? 'text-accent bg-accent/10' : 'text-white'}`} onClick={() => { setControlsOpen(false); onExpand(); }}>
-            <Cast className="w-5 h-5" /> Sync
-          </button>
-          <button className="glass-pill p-3 flex flex-col items-center gap-2 tap text-white" onClick={() => { setControlsOpen(false); setGameOpen(true); }}>
-            <Gamepad2 className="w-5 h-5" /> Game
-          </button>
-        </div>
-      </BottomSheet>
-
-      {/* BottomSheet buat Lirik */}
+      {/* Lirik & Game tetap pakai BottomSheet */}
       <BottomSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} title="Lirik Lagu">
         <LyricsView trackId={track.id} />
       </BottomSheet>
-
       {gameOpen && <GuessTheSong onClose={() => setGameOpen(false)} />}
     </>
   );
