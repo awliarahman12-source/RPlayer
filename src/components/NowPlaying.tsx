@@ -106,32 +106,6 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
           <div className="w-full mt-4 z-10">
             <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
           </div>
-          <div className="mt-4 w-full z-10">
-            <PlayerControls size="lg" />
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-5 w-full z-10">
-            <button className="tap p-2" onClick={() => toggleLike(track.id)} aria-label="Like">
-              <Heart className={`w-5 h-5 ${track.liked ? 'fill-accent text-accent' : 'text-white/70'}`} />
-            </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${lyricsOpen ? 'text-accent' : ''}`} onClick={() => setLyricsOpen(true)}>
-              <Mic2 className="w-3.5 h-3.5" /> Lirik
-            </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${queueOpen ? 'text-accent' : ''}`} onClick={() => setQueueOpen((o) => !o)}>
-              <ListMusic className="w-3.5 h-3.5" /> Antrian
-            </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${playbackRate !== 1 ? 'text-accent' : ''}`} onClick={() => { const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(nextRate); pushToast(`Kecepatan: ${nextRate}x`); }}>
-              <Gauge className="w-3.5 h-3.5" /> {playbackRate}x
-            </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${radioMode ? 'text-accent' : ''}`} onClick={() => { toggleRadioMode(); pushToast(radioMode ? 'Radio Mati' : 'Radio Nyala'); }}>
-              <Radio className="w-3.5 h-3.5" /> Radio
-            </button>
-            <button className={`tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 ${syncMode ? 'text-accent' : ''}`} onClick={() => setSyncMenuOpen(true)}>
-              <Cast className="w-3.5 h-3.5" /> {!syncMode ? 'Sync' : syncMode === 'host' ? 'Host' : syncMode === 'speaker' ? 'Speaker' : 'Remote'}
-            </button>
-            <button className="tap glass-pill px-3 py-1.5 text-xs flex items-center gap-1.5 text-white" onClick={() => setGameOpen(true)}>
-              <Gamepad2 className="w-3.5 h-3.5" /> Game
-            </button>
-          </div>
         </div>
         
         {queueOpen && (
