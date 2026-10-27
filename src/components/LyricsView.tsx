@@ -32,10 +32,11 @@ function parsePlain(text: string): LyricLine[] {
 
 interface LyricsViewProps {
   trackId: string;
-  variant?: 'sheet' | 'full' | 'desktop-panel'; // <-- Tambah varian baru
+  variant?: 'sheet' | 'full' | 'desktop-panel';
+  hideEditButton?: boolean; // <-- Tambahan
 }
 
-export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
+export function LyricsView({ trackId, variant = 'sheet', hideEditButton = false }: LyricsViewProps) {
   const full = variant === 'full';
   const desktopPanel = variant === 'desktop-panel';
   
@@ -106,9 +107,11 @@ export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
     return (
       <div className={`flex flex-col items-center justify-center text-center gap-4 ${full || desktopPanel ? 'h-full' : 'p-4 h-[60vh]'}`}>
         <p className={full || desktopPanel ? 'text-lg font-bold text-white/40' : 'text-white/50'}>Belum ada lirik</p>
-        <button className="tap px-4 py-2 rounded-full bg-white/15 text-xs font-medium flex items-center gap-2" onClick={startEdit}>
-          <Pencil className="w-3 h-3" /> Tambah lirik
-        </button>
+        {!hideEditButton && (
+          <button className="tap px-4 py-2 rounded-full bg-white/15 text-xs font-medium flex items-center gap-2" onClick={startEdit}>
+            <Pencil className="w-3 h-3" /> Tambah lirik
+          </button>
+        )}
       </div>
     );
   }
@@ -119,21 +122,27 @@ export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
     <div className={`relative h-full`}>
       <div 
         ref={containerRef} 
-        // scroll-hidden dipake biar ga ada scrollbar
-        className={`relative overflow-y-auto scroll-hidden h-full ${full || desktopPanel ? 'px-2 py-4' : 'px-4 text-center'}`} 
+        // Hide scrollbar pake tailwind arbitrary values
+        className={`relative overflow-y-auto h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${full || desktopPanel ? 'px-2 py-4' : 'px-4 text-center'}`} 
         style={mask}
       >
         <div className={full ? 'h-[20vh]' : 'h-10'} />
         {lines.map((line, i) => {
           const active = synced && i === activeIndex;
-          const stateClass = !synced ? 'text-white/85' : active ? 'text-white scale-100' : 'text-white/30 scale-[0.96] hover:text-white/70' + (full ? ' blur-[1px] hover:blur-0' : '');
+          // Warna: Putih untuk aktif, abu-abu untuk non-aktif
+          const stateClass = !synced 
+            ? 'text-white/85' 
+            : active 
+              ? 'text-white scale-100' 
+              : 'text-white/30 scale-[0.96] hover:text-white/70' + (full ? ' blur-[1px] hover:blur-0' : '');
+          
           return (
             <div key={i} ref={(el) => { lineRefs.current[i] = el; }} onClick={() => synced && usePlayer.getState().seek(line.time)}
               className={`transition-all duration-500 ease-out ${synced ? 'cursor-pointer' : ''} ${
                 full ? 'origin-left py-2 pr-8 font-bold leading-tight text-2xl' : 
                 desktopPanel ? 'origin-center py-2 text-center text-sm font-medium' : 
                 'origin-center py-3 text-lg font-medium'
-              } ${stateClass} ${!full && active ? '!text-accent font-bold' : ''}`}
+              } ${stateClass}`}
             >
               {line.text}
             </div>
@@ -141,12 +150,16 @@ export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
         })}
         <div className={full ? 'h-[30vh]' : 'h-10'} />
       </div>
-      <button
-        onClick={startEdit}
-        className={`tap absolute flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md text-xs text-white/60 hover:text-white ${full ? 'bottom-4 right-4' : 'top-0 right-0'}`}
-      >
-        <Pencil className="w-3 h-3" /> Edit
-      </button>
+      
+      {/* Tombol Edit cuma muncul kalau hideEditButton false */}
+      {!hideEditButton && !desktopPanel && (
+        <button
+          onClick={startEdit}
+          className={`tap absolute flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md text-xs text-white/60 hover:text-white ${full ? 'bottom-4 right-4' : 'top-0 right-0'}`}
+        >
+          <Pencil className="w-3 h-3" /> Edit
+        </button>
+      )}
     </div>
   );
 }
