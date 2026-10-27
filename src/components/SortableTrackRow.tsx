@@ -22,7 +22,7 @@ export function SortableTrackRow({ track, index, contextIds, isSelected, onSelec
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-pan-y">
       <TrackRow 
         track={track} 
         index={index} 
