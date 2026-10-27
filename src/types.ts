@@ -82,4 +82,6 @@ export interface PlayerSettings {
   crossfade?: boolean;
   playbackRate: number;
   volumeBoost: number;
+  crossfadeEnabled?: boolean;
+  crossfadeDuration?: number;
 }
