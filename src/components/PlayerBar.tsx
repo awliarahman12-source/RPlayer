@@ -85,7 +85,7 @@ export function PlayerBar({ onExpand, onFullscreen, onShowLyrics }: PlayerBarPro
                 <div className="absolute bottom-14 right-0 glass-strong rounded-2xl p-2 w-48 shadow-2xl animate-spring-up">
                   {!syncSubMenu ? (
                     <div className="space-y-1">
-                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); onShowLyrics(); }}>
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); setLyricsOpen(true); }}>
                         <Mic2 className="w-4 h-4" /> Lirik
                       </button>
                       <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1; setPlaybackRate(next); pushToast(`Kecepatan: ${next}x`); }}>
