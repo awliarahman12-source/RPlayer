@@ -116,7 +116,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile', showLyrics = fal
           
           {/* Bagian Bawah: Lirik */}
           <div className="w-full flex-1 overflow-hidden pt-2">
-            <LyricsView trackId={track.id} variant="desktop-panel" />
+            <LyricsView trackId={track.id} variant="desktop-panel" hideEditButton={true} />
           </div>
         </div>
         
