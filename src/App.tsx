@@ -21,7 +21,7 @@ import { usePresence } from '@/store/presence';
 import { useAuth } from '@/store/auth';
 import { LoginPage } from '@/pages/Login';
 import { PartyGuestPage } from '@/pages/PartyGuest';
-import { SharedPlaylistPage } from '@/pages/SharedPlaylist'; // Pastikan ini ada
+import { SharedPlaylistPage } from '@/pages/SharedPlaylist';
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -52,23 +52,21 @@ export default function App() {
   const load = useLibrary((s) => s.load);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false); // <-- State Fullscreen
   const { user, loading: authLoading } = useAuth();
 
-  // 1. Efek buat Haptic Feedback
   useEffect(() => {
     const handleClick = () => { if (navigator.vibrate) navigator.vibrate(10); };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
 
-  // 2. Efek Utama: Attach Audio, Load Data, Restore Settings, & Sync Device
   useEffect(() => {
     if (audioRef.current) {
       usePlayer.getState()._attach(audioRef.current);
     }
 
     if (user) {
-      // Narik lagu & playlist dari Firebase
       void load().then(async () => {
         try {
           const settings = await getSettingsFromCloud(user);
@@ -79,7 +77,6 @@ export default function App() {
       });
     }
 
-    // Mulai dengerin device lain (Sync) & Presence
     const unsub = user ? onSyncPlaybackChange(user, (state) => {
       usePlayer.getState()._handleRemoteSync(state);
     }) : () => {};
@@ -93,7 +90,6 @@ export default function App() {
     };
   }, [user, load]);
 
-  // 3. Efek Keyboard Shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -113,7 +109,6 @@ export default function App() {
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
 
-  // Route khusus buat Share & Party (Tanpa Login)
   if (window.location.hash.startsWith('#/share/')) {
     return (
       <HashRouter>
@@ -166,8 +161,15 @@ export default function App() {
             <div className="pointer-events-auto w-full"><TabBar /></div>
           </div>
 
-          <div className="hidden lg:block"><PlayerBar onExpand={() => setNowOpen(true)} /></div>
+          {/* TAMBAHAN: Props onFullscreen ke PlayerBar */}
+          <div className="hidden lg:block">
+            <PlayerBar onExpand={() => setNowOpen(true)} onFullscreen={() => setFullscreenOpen(true)} />
+          </div>
+          
           <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="mobile" />
+          
+          {/* TAMBAHAN: Render NowPlaying Fullscreen */}
+          <NowPlaying open={fullscreenOpen} onClose={() => setFullscreenOpen(false)} variant="fullscreen" />
         </>
       )}
     </HashRouter>
