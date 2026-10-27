@@ -69,6 +69,12 @@ let audioEl: HTMLAudioElement | null = null;
 let lastTick = 0;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let seekPushTimer: ReturnType<typeof setTimeout> | null = null;
+// --- state crossfade ---
+let fadeMul = 1; // pengali volume untuk fade lagu baru (0..1), terpisah dari slider volume
+let fadeToken = 0; // pembatal fade yang sedang jalan
+let playToken = 0; // pembatal loadAndPlay lama kalau user pencet next berkali-kali
+let outgoing: HTMLAudioElement | null = null; // lagu lama yang di-fade out (overlap)
+let crossfadeTriggered = false;
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -180,6 +186,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
         });
       }
     } else {
+      killOutgoing();
       audioEl.pause();
       set({ isPlaying: false });
       updateMediaSession(get);
@@ -188,6 +195,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   clearCurrent: () => {
+    killOutgoing();
     if (audioEl) {
       audioEl.pause();
       audioEl.removeAttribute('src');
@@ -243,8 +251,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   setVolume: (v) => {
     const vol = Math.max(0, Math.min(1, v));
-    if (audioEl) audioEl.volume = vol * get().volumeBoost;
     set({ volume: vol });
+    applyVolume(get);
     persist(get);
   },
 
@@ -274,7 +282,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
   toggleCrossfade: () => { if (get().syncMode === 'speaker') return; set((s) => ({ crossfade: !s.crossfade })); persist(get); pushSyncState(get); },
   setPlaybackRate: (rate) => { if (get().syncMode === 'speaker') return; if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); pushSyncState(get); },
-  setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); pushSyncState(get); },
+  setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); set({ volumeBoost: boost }); applyVolume(get); persist(get); pushSyncState(get); },
     setCrossfadeEnabled: (enabled) => {
     set({ crossfadeEnabled: enabled });
     persist(get);
@@ -294,6 +302,18 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       persist(get);
       if (get().syncMode === 'host' && get().isPlaying) pushSyncState(get);
     }
+
+    // Crossfade otomatis: mulai lagu berikutnya sebelum lagu ini habis supaya saling menimpa
+    const st = get();
+    if (st.crossfadeEnabled && !crossfadeTriggered && st.queue.length > 0 && st.repeat !== 'one' && st.syncMode !== 'speaker' && st.syncMode !== 'remote' && !audioEl.paused) {
+      const fadeSec = Math.max(0.6, st.crossfadeDuration || 3);
+      const dur = audioEl.duration;
+      const remaining = dur - audioEl.currentTime;
+      if (isFinite(dur) && dur > fadeSec * 2 && remaining > 0.3 && remaining <= fadeSec) {
+        crossfadeTriggered = true;
+        void get().next();
+      }
+    }
   },
   _onLoadedMetadata: () => { if (!audioEl) return; set({ duration: audioEl.duration || 0 }); },
   _onEnded: () => void get().next(),
@@ -305,7 +325,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   _attach: (el) => {
     audioEl = el;
-    audioEl.volume = get().syncMode === 'remote' ? 0 : get().volume * get().volumeBoost;
+    audioEl.volume = get().syncMode === 'remote' ? 0 : Math.min(1, get().volume * get().volumeBoost);
     audioEl.playbackRate = get().playbackRate;
     audioEl.addEventListener('timeupdate', get()._onTimeUpdate);
     audioEl.addEventListener('loadedmetadata', get()._onLoadedMetadata);
@@ -385,7 +405,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ syncMode: role });
     
     if (audioEl) {
-      audioEl.volume = role === 'remote' ? 0 : state.volume * state.volumeBoost;
+      audioEl.volume = role === 'remote' ? 0 : Math.min(1, state.volume * state.volumeBoost);
     }
     
     void get()._forceSyncWithHost();
@@ -409,7 +429,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
     if (audioEl) {
       if (isRemote) audioEl.volume = 0;
-      else audioEl.volume = state.volume * state.volumeBoost;
+      else audioEl.volume = Math.min(1, state.volume * state.volumeBoost);
     }
 
     if (isHost && remote.deviceId === usePresence.getState().deviceId) return;
@@ -468,58 +488,102 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 }));
 
-async function loadAndPlay(track: Track, set: any, get: any) {
-  const state = get();
-  const isCrossfading = state.crossfadeEnabled && audioEl && !audioEl.paused && state.currentTrack;
-
-  if (isCrossfading && audioEl) {
-    // Fade Out lagu lama
-    const originalVol = audioEl.volume;
-    const steps = 20;
-    const stepTime = (state.crossfadeDuration * 1000) / steps;
-    const volStep = originalVol / steps;
-    
-    for (let i = 0; i < steps; i++) {
-      if (audioEl.volume > 0) audioEl.volume = Math.max(0, audioEl.volume - volStep);
-      await new Promise(r => setTimeout(r, stepTime));
-    }
-    audioEl.pause();
-    audioEl.volume = originalVol; // Balikin volume ke asli buat lagu baru
-  }
-
-  set({ currentTrack: track, position: 0, duration: track.duration || 0, error: null });
+function applyVolume(get: () => PlayerState) {
   if (!audioEl) return;
+  const s = get();
+  audioEl.volume = s.syncMode === 'remote' ? 0 : Math.max(0, Math.min(1, s.volume * s.volumeBoost * fadeMul));
+}
+
+/** Naikkan/turunkan fadeMul dengan kurva equal-power. Berbasis waktu (bukan rAF) supaya tetap jalan di tab background. */
+function rampFadeMul(to: number, ms: number, get: () => PlayerState): Promise<void> {
+  const token = ++fadeToken;
+  const from = fadeMul;
+  const t0 = performance.now();
+  return new Promise((resolve) => {
+    const timer = setInterval(() => {
+      if (token !== fadeToken) { clearInterval(timer); resolve(); return; }
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      const curve = to > from ? Math.sin((p * Math.PI) / 2) : 1 - Math.sin((p * Math.PI) / 2);
+      fadeMul = to > from ? from + (to - from) * curve : to + (from - to) * curve;
+      applyVolume(get);
+      if (p >= 1) { clearInterval(timer); resolve(); }
+    }, 40);
+  });
+}
+
+function killOutgoing() {
+  if (!outgoing) return;
+  const o = outgoing;
+  outgoing = null;
+  try { o.pause(); o.removeAttribute('src'); o.load(); } catch { /* abaikan */ }
+}
+
+/** Lagu lama diputar di elemen audio terpisah sambil di-fade out, jadi benar-benar overlap dengan lagu baru. */
+function startOutgoing(ms: number) {
+  if (!audioEl || !audioEl.src) return;
+  killOutgoing();
+  const o = new Audio();
+  o.src = audioEl.currentSrc || audioEl.src;
+  o.currentTime = audioEl.currentTime;
+  const startVol = audioEl.volume;
+  o.volume = startVol;
+  outgoing = o;
+  void o.play().catch(() => { if (outgoing === o) killOutgoing(); });
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    if (outgoing !== o) { clearInterval(timer); return; }
+    const p = Math.min(1, (performance.now() - t0) / ms);
+    o.volume = Math.max(0, startVol * Math.cos((p * Math.PI) / 2));
+    if (p >= 1) { clearInterval(timer); killOutgoing(); }
+  }, 40);
+}
+
+async function loadAndPlay(track: Track, set: any, get: any) {
+  const myToken = ++playToken;
+  const state = get();
+  const wasPlaying = !!(audioEl && !audioEl.paused && !audioEl.ended && audioEl.src && state.currentTrack);
+  const useFade = !!state.crossfadeEnabled && wasPlaying;
+  const ms = Math.max(600, (state.crossfadeDuration || 3) * 1000);
+
+  crossfadeTriggered = false;
+  fadeToken++; // batalkan fade lama yang masih jalan
+
+  if (useFade) startOutgoing(ms); // lagu lama lanjut main di elemen terpisah, volumenya turun pelan
+  else killOutgoing();
+
+  fadeMul = useFade ? 0 : 1; // lagu baru mulai dari senyap kalau crossfade
+  applyVolume(get);
+
+  // UI dan background langsung ganti ke lagu baru (nggak nunggu fade selesai)
+  set({ currentTrack: track, position: 0, duration: track.duration || 0, error: null });
+  void updateAmbient(track, set);
+  if (!audioEl) return;
+
   try {
     const localUrl = await getTrackUrl(track.id, (id) => db.getAudioBlob(id));
+    if (myToken !== playToken) return; // sudah ada permintaan lagu yang lebih baru
     let url = localUrl || track.audioUrl;
     if (url && url.includes('.r2.dev')) {
       url = `https://r2-proxy.awliarahman12-ca2.workers.dev${new URL(url).pathname}`;
     }
-    if (!url) { set({ error: 'File tidak ditemukan' }); setTimeout(() => void get().next(), 800); return; }
-    
+    if (!url) {
+      fadeMul = 1; applyVolume(get);
+      set({ error: 'File tidak ditemukan' });
+      setTimeout(() => void get().next(), 800);
+      return;
+    }
+
     audioEl.src = url;
     audioEl.currentTime = 0;
     set({ isBuffering: true });
-    
-    // Fade In lagu baru
-    if (isCrossfading && audioEl) {
-      const targetVol = state.volume * state.volumeBoost;
-      audioEl.volume = 0;
-      const steps = 20;
-      const stepTime = (state.crossfadeDuration * 1000) / steps;
-      const volStep = targetVol / steps;
-      
-      await audioEl.play().catch(() => {});
-      
-      for (let i = 0; i < steps; i++) {
-        if (audioEl.volume < targetVol) audioEl.volume = Math.min(targetVol, audioEl.volume + volStep);
-        await new Promise(r => setTimeout(r, stepTime));
-      }
-    } else {
-      await audioEl.play().catch((e) => {});
-    }
-    
-    void updateAmbient(track, set);
+
+    let started = true;
+    await audioEl.play().catch(() => { started = false; });
+    if (myToken !== playToken) return;
+
+    if (useFade && started) void rampFadeMul(1, ms, get);
+    else { fadeMul = 1; applyVolume(get); }
+
     void db.updateTrack(track.id, { lastPlayedAt: Date.now(), playCount: (track.playCount || 0) + 1 });
     useLibrary.setState((s) => ({
       tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, lastPlayedAt: Date.now() } : t)),
@@ -527,6 +591,7 @@ async function loadAndPlay(track: Track, set: any, get: any) {
     persist(get);
     pushSyncState(get);
   } catch (e) {
+    fadeMul = 1; applyVolume(get);
     set({ error: 'Gagal memutar' });
     setTimeout(() => void get().next(), 800);
   }

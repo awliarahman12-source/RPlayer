@@ -328,3 +328,45 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .scroll-hidden {
   padding-bottom: 2px;
 }
+
+/* ============ Transisi halus untuk semua interaksi (klik, toggle, hover) ============ */
+button,
+a,
+[role='button'],
+label,
+select {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform, filter, fill, stroke;
+  transition-duration: 240ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+button:active:not(:disabled),
+[role='button']:active {
+  transform: scale(0.97);
+}
+svg {
+  transition:
+    color 240ms ease,
+    fill 240ms ease,
+    stroke 240ms ease,
+    opacity 240ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+img {
+  transition: opacity 400ms ease;
+}
+.glass,
+.glass-strong,
+.glass-pill,
+.glass-pill-strong {
+  transition:
+    background-color 260ms ease,
+    box-shadow 260ms ease,
+    opacity 260ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+input[type='checkbox'] {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+input[type='checkbox']:active {
+  transform: scale(0.88);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronDown, Heart, ListMusic, Maximize2, Mic2, Minimize2, Pause, Play,
   Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX, X,
@@ -16,12 +16,14 @@ type Panel = 'lyrics' | 'queue' | 'none';
 function Backdrop({ cover }: { cover?: string }) {
   return (
     <div className="absolute inset-0 z-0 overflow-hidden bg-[#0b0b0f]">
+      <AnimatePresence initial={false}>
       <motion.div
         key={cover || 'none'}
         className="absolute inset-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 1.3, ease: 'easeInOut' }}
       >
         {cover ? (
           <>
@@ -49,6 +51,7 @@ function Backdrop({ cover }: { cover?: string }) {
           />
         )}
       </motion.div>
+      </AnimatePresence>
       <div className="absolute inset-0 bg-black/35" />
     </div>
   );

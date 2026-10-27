@@ -1,5 +1,6 @@
 import { parseBlob } from 'music-metadata-browser';
 import type { Track } from '@/types';
+import { readTagsFallback } from './id3';
 
 const SUPPORTED = ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/wav', 'audio/x-wav', 'audio/flac', 'audio/ogg', 'audio/vorbis'];
 const SUPPORTED_EXT = /\.(mp3|m4a|wav|flac|ogg|opus)$/i;
@@ -21,45 +22,57 @@ function downscaleCover(dataUrl: string, maxSize = 512): Promise<string> {
     const img = new Image();
     img.onload = () => {
       const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      if (scale === 1) {
-        resolve(dataUrl);
-        return;
-      }
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         resolve(dataUrl);
         return;
       }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      // Selalu encode ulang ke JPEG dan turunkan kualitas sampai cukup kecil (batas dokumen Firestore 1MB)
+      let q = 0.85;
+      let out = canvas.toDataURL('image/jpeg', q);
+      while (out.length > 250_000 && q > 0.4) {
+        q -= 0.15;
+        out = canvas.toDataURL('image/jpeg', q);
+      }
+      resolve(out);
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
 }
 
+/** Bersihkan sampah di nama file: underscore, "(Official Audio)", "[320kbps]", nomor urut, dll. */
+function cleanName(s: string): string {
+  return s
+    .replace(/_+/g, ' ')
+    .replace(/\s*[\(\[][^\)\]]*(official|lyrics?|lirik|audio|video|mv|hd|hq|kbps|download|downcloud|y2mate|spotdown)[^\)\]]*[\)\]]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function parseFileName(name: string): { title: string; artist: string } {
+  let raw = name.replace(/\.[^.]+$/, '');
+  raw = raw.replace(/^\s*\d{1,3}\s*[-._)]\s+/, ''); // "01 - " / "01. "
+  raw = cleanName(raw);
+  const parts = raw.split(/\s+[-–—]\s+/);
+  if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+  return { title: raw, artist: 'Unknown artist' };
+}
+
+const norm = (s: string) => s.trim().toLowerCase();
+
 export async function fileToTrack(file: File): Promise<Track> {
   const id = uid();
-
-  // 1. Ambil nama file tanpa ekstensi sebagai cadangan (fallback)
-  const rawName = file.name.replace(/\.[^.]+$/, '');
-  let parsedTitle = rawName;
-  let parsedArtist = 'Unknown artist';
-
-  // Trik: Kalau nama file ada strip " - ", pecah jadi Artis dan Judul
-  if (rawName.includes(' - ')) {
-    const parts = rawName.split(' - ');
-    parsedArtist = parts[0].trim();
-    parsedTitle = parts.slice(1).join(' - ').trim();
-  }
+  const parsed = parseFileName(file.name);
 
   const base: Track = {
     id,
-    title: parsedTitle,
-    artist: parsedArtist,
+    title: parsed.title || file.name,
+    artist: parsed.artist,
     album: undefined,
     duration: 0,
     fileName: file.name,
@@ -69,26 +82,52 @@ export async function fileToTrack(file: File): Promise<Track> {
     liked: false,
   };
 
+  let gotTitle = false;
+  let gotArtist = false;
+  let gotCover = false;
+
+  const setCover = async (data: Uint8Array, mime: string) => {
+    try {
+      const blob = new Blob([data as unknown as BlobPart], { type: mime || 'image/jpeg' });
+      base.coverDataUrl = await downscaleCover(await blobToDataUrl(blob));
+      gotCover = true;
+    } catch { /* cover gagal, abaikan */ }
+  };
+
+  // 1) Library music-metadata-browser (mendukung MP3, M4A, FLAC, OGG, dll)
   try {
-    // 2. Baca Metadata ID3 Asli dari dalam file MP3
     const meta = await parseBlob(file);
     const common = meta.common;
-    
-    // 3. Kalau di dalam file ada info, TIMPA hasil tebakan nama file tadi
-    if (common.title) base.title = common.title;
-    if (common.artist) base.artist = common.artist;
+    if (common.title) { base.title = common.title; gotTitle = true; }
+    const artist = common.artist || (common.artists && common.artists.length ? common.artists.join(', ') : '');
+    if (artist) { base.artist = artist; gotArtist = true; }
     if (common.album) base.album = common.album;
     if (meta.format.duration) base.duration = meta.format.duration;
-
-    // 4. Ambil Cover Gambar dari dalam file
     const picture = common.picture?.[0];
-    if (picture) {
-      const blob = new Blob([picture.data], { type: picture.format });
-      const raw = await blobToDataUrl(blob);
-      base.coverDataUrl = await downscaleCover(raw); // Simpan sebagai base64
-    }
+    if (picture) await setCover(picture.data, picture.format);
   } catch {
-    // Kalau gagal baca ID3 (file corrupt atau format aneh), biarin pakai fallback nama file
+    // lanjut ke parser cadangan di bawah
+  }
+
+  // 2) Cadangan: parser ID3 bawaan (jalan tanpa Buffer/polyfill)
+  if (!gotTitle || !gotArtist || !gotCover) {
+    const tags = await readTagsFallback(file);
+    if (tags) {
+      if (!gotTitle && tags.title) { base.title = tags.title; gotTitle = true; }
+      if (!gotArtist && tags.artist) { base.artist = tags.artist; gotArtist = true; }
+      if (!base.album && tags.album) base.album = tags.album;
+      if (!gotCover && tags.picture) await setCover(tags.picture.data, tags.picture.mime);
+    }
+  }
+
+  // 3) Kalau tag cuma sebagian, cocokkan dengan nama file (termasuk nama file yang urutannya terbalik)
+  if (gotTitle && !gotArtist) {
+    if (norm(parsed.title) === norm(base.title)) base.artist = parsed.artist;
+    else if (norm(parsed.artist) === norm(base.title)) base.artist = parsed.title;
+    else base.artist = 'Unknown artist';
+  } else if (!gotTitle && gotArtist) {
+    if (norm(parsed.artist) === norm(base.artist)) base.title = parsed.title;
+    else if (norm(parsed.title) === norm(base.artist)) base.title = parsed.artist;
   }
 
   if (!base.duration) {

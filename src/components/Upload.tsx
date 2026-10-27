@@ -12,8 +12,6 @@ interface DropzoneProps {
 export function UploadButton({ className = '', onUploaded, playlistId }: { className?: string; onUploaded?: () => void; playlistId?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const addFiles = useLibrary((s) => s.addFiles);
-  const addToPlaylist = useLibrary((s) => s.addToPlaylist);
-  const tracks = useLibrary((s) => s.tracks);
   const importing = useLibrary((s) => s.importing);
   const pushToast = useToast((s) => s.push);
 
@@ -27,24 +25,16 @@ export function UploadButton({ className = '', onUploaded, playlistId }: { class
         className="hidden"
         onChange={async (e) => {
           const files = Array.from(e.target.files || []);
-          if (files.length) {
-            const tracksBefore = new Set(tracks.map(t => t.id));
-            await addFiles(files);
-            
-            // Kalau ada playlistId, masukin lagu baru ke playlist
-            if (playlistId) {
-              const storeTracks = useLibrary.getState().tracks;
-              const newTracks = storeTracks.filter(t => !tracksBefore.has(t.id));
-              for (const nt of newTracks) {
-                await addToPlaylist(playlistId, nt.id);
-              }
-              pushToast(`${files.length} lagu ditambahkan ke playlist`);
-            } else {
-              pushToast(`${files.length} lagu ditambahkan`);
-            }
-            onUploaded?.();
-          }
           e.target.value = '';
+          if (!files.length) return;
+          // Kalau ada playlistId, lagu langsung masuk library DAN playlist itu
+          const added = await addFiles(files, { playlistId });
+          if (added.length) {
+            pushToast(playlistId ? `${added.length} lagu ditambahkan ke playlist dan library` : `${added.length} lagu ditambahkan`);
+          } else {
+            pushToast('Tidak ada lagu yang berhasil diimpor');
+          }
+          onUploaded?.();
         }}
       />
       <button

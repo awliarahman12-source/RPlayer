@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
 import type { Track } from '@/types';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, ArrowUpDown } from 'lucide-react';
 import { Cover } from './Cover';
 import { createPortal } from 'react-dom'; // <-- Tambahin ini
 
@@ -53,6 +53,11 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
         <div>
           <label className="text-xs text-white/60 mb-1 block">Judul</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none border border-white/10 focus:border-accent" required />
+        </div>
+        <div className="flex justify-center -my-1">
+          <button type="button" onClick={() => { setTitle(artist); setArtist(title); }} className="tap flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-white/70 hover:text-white">
+            <ArrowUpDown className="w-3 h-3" /> Tukar judul dan artis
+          </button>
         </div>
         <div>
           <label className="text-xs text-white/60 mb-1 block">Artis</label>

@@ -23,6 +23,7 @@ export function TrackRow({ track, index, contextIds, onPlay, showAlbum, isSelect
   const togglePlay = usePlayer((s) => s.togglePlay);
   const pushToast = useToast((s) => s.push);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null); // dropdown menu nempel di tombol titik tiga
   
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -49,11 +50,11 @@ export function TrackRow({ track, index, contextIds, onPlay, showAlbum, isSelect
     <>
       <div
         className={`group flex items-center gap-3 px-3 py-2 rounded-2xl tap cursor-pointer transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent ${
-          isCurrent ? 'bg-white/10' : isSelected ? 'bg-accent/20' : 'hover:bg-white/5 hover:scale-[1.01] hover:shadow-lg'
+          isCurrent || menuOpen ? 'bg-white/10' : isSelected ? 'bg-accent/20' : 'hover:bg-white/5 hover:scale-[1.01] hover:shadow-lg'
         }`}
         onClick={handlePlay}
         onDoubleClick={handlePlay}
-        onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(true); }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchEnd}
@@ -77,10 +78,10 @@ export function TrackRow({ track, index, contextIds, onPlay, showAlbum, isSelect
         {showAlbum && <div className="hidden sm:block truncate text-[13px] text-white/40 flex-1 min-w-0 max-w-[180px]">{track.album || '—'}</div>}
         <div className="flex items-center gap-1">
           <button className="opacity-0 group-hover:opacity-100 tap p-2 text-white/60 hover:text-white transition-opacity" onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }} aria-label="Quick Add"><Plus className="w-4 h-4" /></button>
-          <button className="opacity-60 hover:opacity-100 tap p-2 -mr-1" onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }} aria-label="Menu"><MoreHorizontal className="w-5 h-5" /></button>
+          <button ref={menuBtnRef} className="opacity-60 hover:opacity-100 tap p-2 -mr-1" onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }} aria-label="Menu"><MoreHorizontal className="w-5 h-5" /></button>
         </div>
       </div>
-      <TrackMenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} track={track} onToast={pushToast} />
+      <TrackMenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} track={track} onToast={pushToast} anchorRef={menuBtnRef} />
     </>
   );
 }

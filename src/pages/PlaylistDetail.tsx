@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image, FileText, Share2 } from 'lucide-react';
+import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Search, X, Image, FileText, Share2, UploadCloud } from 'lucide-react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
@@ -24,12 +24,15 @@ export function PlaylistDetailPage() {
   const reorderPlaylistTracks = useLibrary((s) => s.reorderPlaylistTracks);
   const updatePlaylistCover = useLibrary((s) => s.updatePlaylistCover);
   const updatePlaylistNotes = useLibrary((s) => s.updatePlaylistNotes);
+  const addFiles = useLibrary((s) => s.addFiles);
+  const importing = useLibrary((s) => s.importing);
   const playTracks = usePlayer((s) => s.playTracks);
   const toggleShuffle = usePlayer((s) => s.toggleShuffle);
   const shuffle = usePlayer((s) => s.shuffle);
   const pushToast = useToast((s) => s.push);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [coverOpen, setCoverOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -58,6 +61,15 @@ export function PlaylistDetailPage() {
 
   const handlePlay = () => { if (playlistTracks.length) void playTracks(playlistTracks.map((t) => t.id)); };
   const handleShuffle = () => { if (!shuffle) toggleShuffle(); if (playlistTracks.length) void playTracks(playlistTracks.map((t) => t.id)); };
+
+  // Upload lagu dari perangkat: langsung masuk library dan playlist ini
+  const handleAddFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length || !playlist) return;
+    const added = await addFiles(files, { playlistId: playlist.id });
+    pushToast(added.length ? `${added.length} lagu ditambahkan ke playlist dan library` : 'Tidak ada lagu yang berhasil diimpor');
+  };
 
   if (!isLiked && !playlist) return <div className="px-4 py-12 text-center text-white/50">Playlist tidak ditemukan.<div className="mt-4"><Link to="/library" className="text-accent">Kembali ke Library</Link></div></div>;
 
@@ -103,6 +115,26 @@ export function PlaylistDetailPage() {
         <button className={`tap glass-pill w-12 h-12 flex items-center justify-center ${shuffle ? 'text-accent' : 'text-white/80'}`} onClick={handleShuffle} disabled={playlistTracks.length === 0} aria-label="Shuffle">
           <Shuffle className="w-5 h-5" />
         </button>
+        {!isLiked && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg,.opus"
+              multiple
+              className="hidden"
+              onChange={handleAddFiles}
+            />
+            <button
+              className="tap glass-pill h-12 px-5 flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+            >
+              <UploadCloud className="w-4 h-4" />
+              {importing ? 'Mengimpor…' : 'Add songs'}
+            </button>
+          </>
+        )}
         {!isLiked && (
           <button className="tap glass-pill w-12 h-12 flex items-center justify-center text-white/80 ml-auto" onClick={() => setMenuOpen(true)} aria-label="Menu">
             <MoreHorizontal className="w-5 h-5" />
@@ -184,7 +216,7 @@ export function PlaylistDetailPage() {
             if (notes !== null && playlist) updatePlaylistNotes(playlist.id, notes);
             setMenuOpen(false);
           }} />
-          <SheetItem icon={<Plus className="w-5 h-5" />} label="Tambah lagu" onClick={() => { setMenuOpen(false); navigate('/library'); pushToast('Cari lagu lalu pakai menu "Tambahkan ke playlist"'); }} />
+          <SheetItem icon={<UploadCloud className="w-5 h-5" />} label="Tambah lagu (upload)" onClick={() => { setMenuOpen(false); fileInputRef.current?.click(); }} />
           <div className="h-px bg-white/10 my-1" />
           <SheetItem icon={<Trash2 className="w-5 h-5" />} label="Hapus playlist" danger onClick={() => {
             if (playlist && confirm(`Hapus playlist "${name}"? Lagu tidak ikut terhapus.`)) {
