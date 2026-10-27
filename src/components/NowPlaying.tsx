@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { getDominantColor } from '@/lib/color';
 import { GuessTheSong } from './GuessTheSong';
 import { ChevronDown, Heart, ListMusic, X, MoreHorizontal, Gauge, Mic2, Radio, Gamepad2, Monitor, Smartphone, Cast } from 'lucide-react';
@@ -173,7 +174,21 @@ export function NowPlaying({ open, onClose, variant = 'mobile', showLyrics = fal
   return (
     <div className={`lg:hidden fixed inset-0 z-[100] flex flex-col bg-[#0b0b0f] transition-transform duration-300 ease-in-out ${open ? 'translate-y-0' : 'translate-y-[100dvh]'}`} style={open && dragY > 0 ? { transform: `translateY(${dragY}px)`, transition: 'none' } : !open ? { transform: 'translateY(100%)' } : undefined}>
       <div className="absolute inset-0 overflow-hidden z-0">
-        {track.coverDataUrl && <img src={track.coverDataUrl} alt="" className="w-full h-full object-cover opacity-60" style={{ filter: 'blur(80px) saturate(2) brightness(0.6)', transform: 'scale(1.2)' }} />}
+        <AnimatePresence mode="popLayout">
+          {track.coverDataUrl && (
+            <motion.img 
+              key={track.coverDataUrl}
+              src={track.coverDataUrl} 
+              alt="" 
+              className="w-full h-full object-cover opacity-60 absolute inset-0" 
+              style={{ filter: 'blur(80px) saturate(2) brightness(0.6)', transform: 'scale(1.2)' }} 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+            />
+          )}
+        </AnimatePresence>
         <div className="absolute inset-0 bg-black/40" />
       </div>
 

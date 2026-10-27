@@ -28,6 +28,10 @@ interface PlayerState {
   radioMode: boolean;
   syncMode: SyncMode | null;
   hostId: string | null;
+  crossfadeEnabled: boolean;
+  crossfadeDuration: number;
+  setCrossfadeEnabled: (enabled: boolean) => void;
+  setCrossfadeDuration: (duration: number) => void;
   
   setSleepTimer: (minutes: number | null) => void;
   toggleRadioMode: () => void;
@@ -96,6 +100,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   radioMode: false,
   syncMode: null,
   hostId: null,
+  crossfadeEnabled: false,
+  crossfadeDuration: 3, // default 3 detik
 
   setSyncMode: (mode) => {
     if (!mode) return;
@@ -269,6 +275,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   toggleCrossfade: () => { if (get().syncMode === 'speaker') return; set((s) => ({ crossfade: !s.crossfade })); persist(get); pushSyncState(get); },
   setPlaybackRate: (rate) => { if (get().syncMode === 'speaker') return; if (audioEl) audioEl.playbackRate = rate; set({ playbackRate: rate }); persist(get); pushSyncState(get); },
   setVolumeBoost: (boost) => { if (get().syncMode === 'speaker') return; const newVol = Math.min(1.5, Math.max(0, get().volume * boost)); if (audioEl) audioEl.volume = newVol; set({ volumeBoost: boost }); persist(get); pushSyncState(get); },
+    setCrossfadeEnabled: (enabled) => {
+    set({ crossfadeEnabled: enabled });
+    persist(get);
+  },
+  setCrossfadeDuration: (duration) => {
+    set({ crossfadeDuration: duration });
+    persist(get);
+  },
 
   _onTimeUpdate: () => {
     if (!audioEl) return;
@@ -313,7 +327,9 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   _restore: async (settings) => {
     set({
-      volume: settings.volume, 
+      volumeBoost: settings.volumeBoost || 1,
+      crossfadeEnabled: settings.crossfadeEnabled || false,
+      crossfadeDuration: settings.crossfadeDuration || 3,
       shuffle: settings.shuffle, 
       repeat: settings.repeat, 
       queue: settings.queue || [],
@@ -453,6 +469,24 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 }));
 
 async function loadAndPlay(track: Track, set: any, get: any) {
+  const state = get();
+  const isCrossfading = state.crossfadeEnabled && audioEl && !audioEl.paused && state.currentTrack;
+
+  if (isCrossfading && audioEl) {
+    // Fade Out lagu lama
+    const originalVol = audioEl.volume;
+    const steps = 20;
+    const stepTime = (state.crossfadeDuration * 1000) / steps;
+    const volStep = originalVol / steps;
+    
+    for (let i = 0; i < steps; i++) {
+      if (audioEl.volume > 0) audioEl.volume = Math.max(0, audioEl.volume - volStep);
+      await new Promise(r => setTimeout(r, stepTime));
+    }
+    audioEl.pause();
+    audioEl.volume = originalVol; // Balikin volume ke asli buat lagu baru
+  }
+
   set({ currentTrack: track, position: 0, duration: track.duration || 0, error: null });
   if (!audioEl) return;
   try {
@@ -467,7 +501,23 @@ async function loadAndPlay(track: Track, set: any, get: any) {
     audioEl.currentTime = 0;
     set({ isBuffering: true });
     
-    await audioEl.play().catch((e) => {});
+    // Fade In lagu baru
+    if (isCrossfading && audioEl) {
+      const targetVol = state.volume * state.volumeBoost;
+      audioEl.volume = 0;
+      const steps = 20;
+      const stepTime = (state.crossfadeDuration * 1000) / steps;
+      const volStep = targetVol / steps;
+      
+      await audioEl.play().catch(() => {});
+      
+      for (let i = 0; i < steps; i++) {
+        if (audioEl.volume < targetVol) audioEl.volume = Math.min(targetVol, audioEl.volume + volStep);
+        await new Promise(r => setTimeout(r, stepTime));
+      }
+    } else {
+      await audioEl.play().catch((e) => {});
+    }
     
     void updateAmbient(track, set);
     void db.updateTrack(track.id, { lastPlayedAt: Date.now(), playCount: (track.playCount || 0) + 1 });
@@ -503,7 +553,10 @@ function persist(get: () => PlayerState) {
     const settings: PlayerSettings = {
       volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, currentTrackId: s.currentTrack?.id || null,
       position: audioEl?.currentTime || 0, queue: s.queue, sleepTimerEnd: s.sleepTimerEnd, crossfade: s.crossfade,
-      playbackRate: s.playbackRate, volumeBoost: s.volumeBoost,
+      playbackRate: s.playbackRate,
+      volumeBoost: s.volumeBoost,
+      crossfadeEnabled: s.crossfadeEnabled,
+      crossfadeDuration: s.crossfadeDuration,
     };
     void fs.saveSettingsToCloud(user, settings);
   }, 1500);

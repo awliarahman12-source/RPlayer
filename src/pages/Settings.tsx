@@ -12,8 +12,13 @@ import { LogOut } from 'lucide-react';
 export function SettingsPage() {
   const sleepTimerEnd = usePlayer((s) => s.sleepTimerEnd);
   const setSleepTimer = usePlayer((s) => s.setSleepTimer);
-  const crossfade = usePlayer((s) => s.crossfade);
-  const toggleCrossfade = usePlayer((s) => s.toggleCrossfade);
+  
+  // State baru buat Crossfade
+  const crossfadeEnabled = usePlayer((s) => s.crossfadeEnabled);
+  const crossfadeDuration = usePlayer((s) => s.crossfadeDuration);
+  const setCrossfadeEnabled = usePlayer((s) => s.setCrossfadeEnabled);
+  const setCrossfadeDuration = usePlayer((s) => s.setCrossfadeDuration);
+
   const pushToast = useToast((s) => s.push);
   const logout = useAuth((s) => s.logout);
 
@@ -36,6 +41,7 @@ export function SettingsPage() {
       <h1 className="text-3xl lg:text-4xl font-bold text-shadow-glass mb-6">Settings</h1>
 
       <div className="glass rounded-glass p-2">
+        {/* Sleep Timer */}
         <button className="w-full flex items-center justify-between px-4 py-4 tap hover:bg-white/5 rounded-2xl transition-colors" onClick={() => setTimerOpen(true)}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full glass flex items-center justify-center text-white"><Timer className="w-5 h-5" /></div>
@@ -44,15 +50,30 @@ export function SettingsPage() {
         </button>
 
         <div className="h-px bg-white/10 mx-4" />
-        <button className="w-full flex items-center justify-between px-4 py-4 tap hover:bg-white/5 rounded-2xl transition-colors" onClick={() => { toggleCrossfade(); pushToast(crossfade ? 'Crossfade Mati' : 'Crossfade Nyala'); }}>
+        
+        {/* Crossfade Toggle */}
+        <button className="w-full flex items-center justify-between px-4 py-4 tap hover:bg-white/5 rounded-2xl transition-colors" onClick={() => { setCrossfadeEnabled(!crossfadeEnabled); pushToast(crossfadeEnabled ? 'Crossfade Mati' : 'Crossfade Nyala'); }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full glass flex items-center justify-center text-white"><Activity className="w-5 h-5" /></div>
-            <div className="text-left"><div className="font-semibold text-white">Crossfade</div><div className="text-xs text-white/50">Transisi lagu lebih halus</div></div>
+            <div className="text-left"><div className="font-semibold text-white">Crossfade</div><div className="text-xs text-white/50">Transisi lagu otomatis (Fade out/in)</div></div>
           </div>
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${crossfade ? 'bg-accent text-black' : 'border border-white/30'}`}>{crossfade && <Check className="w-4 h-4" />}</div>
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${crossfadeEnabled ? 'bg-accent text-black' : 'border border-white/30'}`}>{crossfadeEnabled && <Check className="w-4 h-4" />}</div>
         </button>
 
+        {/* Crossfade Duration Slider */}
+        {crossfadeEnabled && (
+          <div className="w-full flex flex-col px-4 py-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium text-white">Durasi Crossfade</div>
+              <div className="text-xs text-accent font-bold">{crossfadeDuration} detik</div>
+            </div>
+            <input type="range" min="1" max="10" value={crossfadeDuration} onChange={(e) => setCrossfadeDuration(Number(e.target.value))} className="w-full accent-accent" />
+          </div>
+        )}
+
         <div className="h-px bg-white/10 mx-4" />
+        
+        {/* Glass Blur Intensity */}
         <div className="w-full flex flex-col px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full glass flex items-center justify-center text-white"><Sliders className="w-5 h-5" /></div>
