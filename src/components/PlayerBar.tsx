@@ -94,7 +94,7 @@ export function PlayerBar({ onExpand, onFullscreen }: PlayerBarProps) {
                         <Radio className="w-4 h-4" /> Radio {radioMode ? 'On' : 'Off'}
                       </button>
                       <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => setSyncSubMenu(true)}>
-                        <Cast className="w-4 h-4" /> Sync Mode
+                        <Cast className="w-4 h-4" /> Sync: {syncMode === 'host' ? 'Host' : syncMode === 'remote' ? 'Remote' : syncMode === 'speaker' ? 'Speaker' : 'Off'}
                       </button>
                       <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); setGameOpen(true); }}>
                         <Gamepad2 className="w-4 h-4" /> Game
@@ -109,9 +109,15 @@ export function PlayerBar({ onExpand, onFullscreen }: PlayerBarProps) {
                       <button className="w-full flex items-center gap-2 px-2 py-1 text-xs text-white/50 hover:text-white" onClick={() => setSyncSubMenu(false)}>
                         <X className="w-3 h-3" /> Kembali
                       </button>
-                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'host' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('host'); setMenuOpen(false); }}>Host</button>
-                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'remote' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('remote'); setMenuOpen(false); }}>Remote</button>
-                      <button className={`w-full text-left px-3 py-2 text-sm rounded-xl tap ${syncMode === 'speaker' ? 'text-accent font-bold bg-white/5' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('speaker'); setMenuOpen(false); }}>Speaker</button>
+                      <button className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl tap ${syncMode === 'host' ? 'text-accent font-bold bg-white/10' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('host'); setMenuOpen(false); }}>
+                        <span>Host</span> {syncMode === 'host' && <span className="text-xs bg-accent text-black px-2 py-0.5 rounded-full">Aktif</span>}
+                      </button>
+                      <button className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl tap ${syncMode === 'remote' ? 'text-accent font-bold bg-white/10' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('remote'); setMenuOpen(false); }}>
+                        <span>Remote</span> {syncMode === 'remote' && <span className="text-xs bg-accent text-black px-2 py-0.5 rounded-full">Aktif</span>}
+                      </button>
+                      <button className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl tap ${syncMode === 'speaker' ? 'text-accent font-bold bg-white/10' : 'text-white hover:bg-white/10'}`} onClick={() => { setSyncMode('speaker'); setMenuOpen(false); }}>
+                        <span>Speaker</span> {syncMode === 'speaker' && <span className="text-xs bg-accent text-black px-2 py-0.5 rounded-full">Aktif</span>}
+                      </button>
                     </div>
                   )}
                 </div>
