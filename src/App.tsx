@@ -63,7 +63,6 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [desktopLyricsOpen, setDesktopLyricsOpen] = useState(false); // <-- State Fullscreen
   const { user, loading: authLoading } = useAuth();
   const hash = useHash();
 
@@ -163,7 +162,7 @@ export default function App() {
                 <AnimatedRoutes />
               </div>
               <div className="hidden lg:block w-[340px] shrink-0 p-3 pl-0 h-full">
-                <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" showLyrics={desktopLyricsOpen} />
+                <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" />
               </div>
             </main>
           </div>
@@ -178,7 +177,7 @@ export default function App() {
             <PlayerBar 
               onExpand={() => setNowOpen(true)} 
               onFullscreen={() => setFullscreenOpen(true)} 
-              onShowLyrics={() => setDesktopLyricsOpen(!desktopLyricsOpen)} 
+              onShowLyrics={() => {}} // Abaikan aja, atau hapus prop ini kalo mau di PlayerBar
             />
           </div>
           
