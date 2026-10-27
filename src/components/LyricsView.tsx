@@ -32,11 +32,13 @@ function parsePlain(text: string): LyricLine[] {
 
 interface LyricsViewProps {
   trackId: string;
-  variant?: 'sheet' | 'full';
+  variant?: 'sheet' | 'full' | 'desktop-panel'; // <-- Tambah varian baru
 }
 
 export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
   const full = variant === 'full';
+  const desktopPanel = variant === 'desktop-panel';
+  
   const track = useLibrary((s) => s.tracks.find((t) => t.id === trackId));
   const updateLyrics = useLibrary((s) => s.updateLyrics);
   const position = usePlayer((s) => s.position);
@@ -86,11 +88,11 @@ export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
 
   if (editing) {
     return (
-      <div className={`flex flex-col gap-3 ${full ? 'h-full justify-center' : 'p-4 h-[60vh] justify-center'}`}>
-        <p className="text-white/60 text-sm">Tempel lirik format LRC (<span className="font-mono">[00:12.00] teks</span>) atau lirik biasa.</p>
+      <div className={`flex flex-col gap-3 p-4 ${full ? 'h-full justify-center' : desktopPanel ? 'h-full justify-center' : 'h-[60vh] justify-center'}`}>
+        <p className="text-white/60 text-sm">Tempel lirik format LRC atau lirik biasa.</p>
         <textarea
           autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
-          className={`w-full bg-white/10 border border-white/15 rounded-2xl p-4 text-white text-sm outline-none resize-none ${full ? 'flex-1 max-h-[60vh]' : 'h-40'}`}
+          className={`w-full bg-white/10 border border-white/15 rounded-2xl p-4 text-white text-sm outline-none resize-none ${full || desktopPanel ? 'flex-1' : 'h-40'}`}
         />
         <div className="flex gap-2 justify-end">
           <button className="tap px-4 py-2 rounded-full bg-white/10 text-sm" onClick={() => setEditing(false)}>Batal</button>
@@ -102,35 +104,47 @@ export function LyricsView({ trackId, variant = 'sheet' }: LyricsViewProps) {
 
   if (lines.length === 0) {
     return (
-      <div className={`flex flex-col items-center justify-center text-center gap-4 ${full ? 'h-full' : 'p-4 h-[60vh]'}`}>
-        <p className={full ? 'text-3xl font-bold text-white/40' : 'text-white/50'}>Belum ada lirik</p>
-        <button className="tap px-5 py-2.5 rounded-full bg-white/15 text-sm font-medium flex items-center gap-2" onClick={startEdit}>
-          <Pencil className="w-4 h-4" /> Tambah lirik
+      <div className={`flex flex-col items-center justify-center text-center gap-4 ${full || desktopPanel ? 'h-full' : 'p-4 h-[60vh]'}`}>
+        <p className={full || desktopPanel ? 'text-lg font-bold text-white/40' : 'text-white/50'}>Belum ada lirik</p>
+        <button className="tap px-4 py-2 rounded-full bg-white/15 text-xs font-medium flex items-center gap-2" onClick={startEdit}>
+          <Pencil className="w-3 h-3" /> Tambah lirik
         </button>
       </div>
     );
   }
 
-  const mask = full ? { maskImage: 'linear-gradient(to bottom, transparent 0, #000 14%, #000 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 14%, #000 80%, transparent 100%)' } : undefined;
+  const mask = full || desktopPanel ? { maskImage: 'linear-gradient(to bottom, transparent 0, #000 10%, #000 90%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 10%, #000 90%, transparent 100%)' } : undefined;
 
   return (
-    <div className={`relative ${full ? 'h-full' : ''}`}>
-      <div ref={containerRef} className={`relative overflow-y-auto scroll-hidden ${full ? 'h-full px-2' : 'h-[60vh] px-4 text-center'}`} style={mask}>
-        <div className={full ? 'h-[30vh]' : 'h-32'} />
+    <div className={`relative h-full`}>
+      <div 
+        ref={containerRef} 
+        // scroll-hidden dipake biar ga ada scrollbar
+        className={`relative overflow-y-auto scroll-hidden h-full ${full || desktopPanel ? 'px-2 py-4' : 'px-4 text-center'}`} 
+        style={mask}
+      >
+        <div className={full ? 'h-[20vh]' : 'h-10'} />
         {lines.map((line, i) => {
           const active = synced && i === activeIndex;
-          const stateClass = !synced ? 'text-white/85' : active ? 'text-white scale-100' : 'text-white/35 scale-[0.96] hover:text-white/70' + (full ? ' blur-[1.5px] hover:blur-0' : '');
+          const stateClass = !synced ? 'text-white/85' : active ? 'text-white scale-100' : 'text-white/30 scale-[0.96] hover:text-white/70' + (full ? ' blur-[1px] hover:blur-0' : '');
           return (
             <div key={i} ref={(el) => { lineRefs.current[i] = el; }} onClick={() => synced && usePlayer.getState().seek(line.time)}
-              className={`transition-all duration-500 ease-out ${synced ? 'cursor-pointer' : ''} ${full ? 'origin-left py-3 pr-8 font-bold leading-tight text-[clamp(1.6rem,3.4vh,2.6rem)]' : 'origin-center py-3 text-lg font-medium'} ${stateClass} ${!full && active ? '!text-accent font-bold' : ''}`}
+              className={`transition-all duration-500 ease-out ${synced ? 'cursor-pointer' : ''} ${
+                full ? 'origin-left py-2 pr-8 font-bold leading-tight text-2xl' : 
+                desktopPanel ? 'origin-center py-2 text-center text-sm font-medium' : 
+                'origin-center py-3 text-lg font-medium'
+              } ${stateClass} ${!full && active ? '!text-accent font-bold' : ''}`}
             >
               {line.text}
             </div>
           );
         })}
-        <div className={full ? 'h-[45vh]' : 'h-32'} />
+        <div className={full ? 'h-[30vh]' : 'h-10'} />
       </div>
-      <button onClick={startEdit} className={`tap absolute flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-md text-xs text-white/60 hover:text-white ${full ? 'bottom-3 right-3' : 'top-2 right-2'}`}>
+      <button
+        onClick={startEdit}
+        className={`tap absolute flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md text-xs text-white/60 hover:text-white ${full ? 'bottom-4 right-4' : 'top-0 right-0'}`}
+      >
         <Pencil className="w-3 h-3" /> Edit
       </button>
     </div>
