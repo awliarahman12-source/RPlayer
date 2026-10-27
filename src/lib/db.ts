@@ -137,3 +137,17 @@ export async function saveAudioBlob(id: string, blob: Blob) {
   const db = await getDB();
   await db.put('audio', { id, blob });
 }
+
+export async function hasAudioBlob(id: string): Promise<boolean> {
+  try {
+    const db = await getDB();
+    return (await db.getKey('audio', id)) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteAudioBlob(id: string) {
+  const db = await getDB();
+  await db.delete('audio', id);
+}

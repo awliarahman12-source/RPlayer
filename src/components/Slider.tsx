@@ -14,9 +14,10 @@ export function Slider({ value, max, onChange, onCommit, className = '', accentC
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localVal, setLocalVal] = useState(value);
+  const valRef = useRef(value);
 
   useEffect(() => {
-    if (!dragging) setLocalVal(value);
+    if (!dragging) { setLocalVal(value); valRef.current = value; }
   }, [value, dragging]);
 
   // Pastikan nilai aman (bukan NaN/Infinity)
@@ -29,6 +30,7 @@ export function Slider({ value, max, onChange, onCommit, className = '', accentC
     const rect = ref.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const newVal = (x / rect.width) * safeMax;
+    valRef.current = newVal;
     setLocalVal(newVal);
     onChange(newVal);
   };
@@ -53,7 +55,7 @@ export function Slider({ value, max, onChange, onCommit, className = '', accentC
         }}
         onPointerUp={() => {
           setDragging(false);
-          onCommit?.(localVal);
+          onCommit?.(valRef.current);
         }}
         onPointerCancel={() => setDragging(false)}
       >

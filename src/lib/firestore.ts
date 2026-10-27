@@ -12,7 +12,9 @@ const cleanUndefined = <T extends object>(obj: T): T => {
 };
 
 export async function saveTrackToCloud(username: string, track: Track) {
-  await setDoc(doc(db, 'users', username, 'tracks', track.id), cleanUndefined(track));
+  // isDownloaded sifatnya per perangkat (IndexedDB), jangan ikut disimpan ke cloud
+  const { isDownloaded: _ignored, ...cloudTrack } = track;
+  await setDoc(doc(db, 'users', username, 'tracks', track.id), cleanUndefined(cloudTrack));
 }
 
 export async function deleteTrackFromCloud(username: string, trackId: string) {

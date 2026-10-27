@@ -14,6 +14,7 @@ import { TrackMenuSheet } from './TrackMenuSheet';
 import { Visualizer } from './Visualizer';
 import { LyricsView } from './LyricsView';
 import { usePresence } from '@/store/presence';
+import { FullscreenPlayer } from './FullscreenPlayer';
 
 interface NowPlayingProps {
   open: boolean;
@@ -128,7 +129,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
             )}
           </div>
         )}
-        {menuTrack && <TrackMenuSheet open={!!menuTrack} onClose={() => setTrackMenuOpen(null)} track={tracks.find((t) => t.id === menuTrack.id)!} />}
+        {menuTrack && <TrackMenuSheet open={!!menuTrack} onClose={() => setMenuTrack(null)} track={tracks.find((t) => t.id === menuTrack.id)!} />}
         
         <BottomSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} title="Lirik Lagu">
           <LyricsView trackId={track.id} />
@@ -158,51 +159,7 @@ export function NowPlaying({ open, onClose, variant = 'mobile' }: NowPlayingProp
   }
   
   if (variant === 'fullscreen') {
-    if (!open) return null;
-    return (
-      <div className="fixed inset-0 z-[200] bg-[#0b0b0f] flex text-white animate-fade-in overflow-hidden">
-        {/* Background Ambient */}
-        <div className="absolute inset-0 overflow-hidden z-0">
-          {track.coverDataUrl && (
-            <img src={track.coverDataUrl} alt="" className="w-full h-full object-cover opacity-30 blur-[100px] scale-150" />
-          )}
-          <div className="absolute inset-0 bg-black/40" />
-        </div>
-
-        {/* Tombol Close */}
-        <button onClick={onClose} className="absolute top-6 right-6 z-50 tap glass-pill w-12 h-12 flex items-center justify-center text-white/70 hover:text-white">
-          <ChevronDown className="w-6 h-6" />
-        </button>
-
-        {/* Layout Kiri: Cover & Info */}
-        <div className="flex-1 flex flex-col justify-center items-center p-12 relative z-10">
-          <div className={`relative transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
-             <Cover src={track.coverDataUrl} alt={track.title} className="w-[500px] aspect-square rounded-3xl shadow-2xl" rounded="xl" />
-             <div className="absolute inset-0 bg-accent/20 blur-3xl -z-10 rounded-full animate-pulse" />
-          </div>
-          <div className="w-full max-w-[500px] mt-10 text-left">
-            <h1 className="text-5xl font-bold truncate">{track.title}</h1>
-            <p className="text-2xl text-white/60 truncate mt-2">{track.artist}</p>
-            {track.album && <p className="text-lg text-white/40 truncate mt-1">{track.album}</p>}
-          </div>
-        </div>
-
-        {/* Layout Kanan: Kontrol & Lirik */}
-        <div className="w-[400px] flex flex-col justify-center gap-8 p-12 relative z-10 glass-strong rounded-l-[40px] border-l border-white/10 bg-black/40">
-          <div>
-            <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
-            <div className="mt-8">
-              <PlayerControls size="lg" />
-            </div>
-          </div>
-
-          <div className="flex-1 mt-8 overflow-y-auto scroll-hidden">
-            <h3 className="text-sm font-semibold text-white/50 mb-4 uppercase tracking-wider text-center">Lirik Lagu</h3>
-            <LyricsView trackId={track.id} />
-          </div>
-        </div>
-      </div>
-    );
+    return <FullscreenPlayer open={open} onClose={onClose} />;
   }
 
   return (

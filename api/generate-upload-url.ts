@@ -14,21 +14,32 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const { filename, contentType } = req.body;
-    const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const filename = body?.filename;
+    const contentType = String(body?.contentType || 'audio/mpeg');
+
+    if (typeof filename !== 'string' || !filename || filename.length > 200) {
+      return res.status(400).json({ error: 'filename tidak valid' });
+    }
+    // Hanya izinkan file audio
+    if (!contentType.startsWith('audio/') && contentType !== 'application/octet-stream') {
+      return res.status(400).json({ error: 'Hanya file audio yang diizinkan' });
+    }
+
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
     const key = `${Date.now()}-${safeName}`;
 
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
       Key: key,
-      ContentType: contentType || 'audio/mpeg',
+      ContentType: contentType,
     });
 
     const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
-    
+
     return res.status(200).json({
       uploadUrl,
-      publicUrl: `${process.env.R2_PUBLIC_URL}/${key}`
+      publicUrl: `${process.env.R2_PUBLIC_URL}/${key}`,
     });
   } catch (error) {
     console.error(error);

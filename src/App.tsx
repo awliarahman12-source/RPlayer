@@ -23,6 +23,16 @@ import { LoginPage } from '@/pages/Login';
 import { PartyGuestPage } from '@/pages/PartyGuest';
 import { SharedPlaylistPage } from '@/pages/SharedPlaylist';
 
+function useHash() {
+  const [hash, setHash] = useState(window.location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return hash;
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
@@ -54,6 +64,7 @@ export default function App() {
   const [nowOpen, setNowOpen] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false); // <-- State Fullscreen
   const { user, loading: authLoading } = useAuth();
+  const hash = useHash();
 
   useEffect(() => {
     const handleClick = () => { if (navigator.vibrate) navigator.vibrate(10); };
@@ -109,7 +120,7 @@ export default function App() {
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-white">Memuat...</div>;
 
-  if (window.location.hash.startsWith('#/share/')) {
+  if (hash.startsWith('#/share/')) {
     return (
       <HashRouter>
         <Routes>
@@ -119,7 +130,7 @@ export default function App() {
     );
   }
 
-  if (window.location.hash.startsWith('#/party/')) {
+  if (hash.startsWith('#/party/')) {
     return (
       <HashRouter>
         <Routes>

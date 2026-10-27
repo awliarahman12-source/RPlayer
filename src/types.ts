@@ -15,16 +15,6 @@ export interface SyncPlaybackState {
   isPlaying: boolean;
   position: number;
   updatedAt: number;
-  originMode?: SyncMode; 
-}
-
-export interface SyncPlaybackState {
-  deviceId: string;
-  hostId: string;
-  trackId: string | null;
-  isPlaying: boolean;
-  position: number;
-  updatedAt: number;
   originMode?: SyncMode;
   repeat?: 'off' | 'all' | 'one';
   shuffle?: boolean;

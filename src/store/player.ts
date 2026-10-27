@@ -38,6 +38,7 @@ interface PlayerState {
   playTrack: (trackId: string, contextIds?: string[]) => Promise<void>;
   playTracks: (trackIds: string[], startIndex?: number) => Promise<void>;
   togglePlay: () => void;
+  clearCurrent: () => void;
   next: () => Promise<void>;
   prev: () => Promise<void>;
   seek: (seconds: number) => void;
@@ -61,6 +62,9 @@ interface PlayerState {
 }
 
 let audioEl: HTMLAudioElement | null = null;
+let lastTick = 0;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let seekPushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -177,6 +181,17 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }
   },
 
+  clearCurrent: () => {
+    if (audioEl) {
+      audioEl.pause();
+      audioEl.removeAttribute('src');
+      audioEl.load();
+    }
+    set({ currentTrack: null, isPlaying: false, isBuffering: false, position: 0, duration: 0, ambientCover: null, ambientColor: null });
+    persist(get);
+    pushSyncState(get);
+  },
+
   next: async () => {
     if (get().syncMode === 'speaker') return;
     const { queue, history, repeat, currentTrack } = get();
@@ -217,7 +232,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (get().syncMode === 'speaker') return;
     if (audioEl && isFinite(seconds)) audioEl.currentTime = seconds;
     set({ position: seconds });
-    pushSyncState(get);
+    pushSyncStateSoon(get);
   },
 
   setVolume: (v) => {
@@ -258,7 +273,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   _onTimeUpdate: () => {
     if (!audioEl) return;
     set({ position: audioEl.currentTime });
-    if (Math.floor(audioEl.currentTime) % 5 === 0) {
+    // Throttle: maksimal sekali tiap 5 detik (timeupdate jalan ~4x/detik)
+    const now = Date.now();
+    if (now - lastTick >= 5000) {
+      lastTick = now;
       persist(get);
       if (get().syncMode === 'host' && get().isPlaying) pushSyncState(get);
     }
@@ -475,14 +493,25 @@ async function updateAmbient(track: Track, set: any) {
 }
 
 function persist(get: () => PlayerState) {
-  const s = get();
-  const settings: PlayerSettings = {
-    volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, currentTrackId: s.currentTrack?.id || null,
-    position: audioEl?.currentTime || 0, queue: s.queue, sleepTimerEnd: s.sleepTimerEnd, crossfade: s.crossfade,
-    playbackRate: s.playbackRate, volumeBoost: s.volumeBoost,
-  };
   const user = useAuth.getState().user;
-  if (user) void fs.saveSettingsToCloud(user, settings);
+  if (!user) return;
+  // Debounce tulis ke Firestore biar nggak boros kuota (volume slider, seek, dll)
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const s = get();
+    const settings: PlayerSettings = {
+      volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, currentTrackId: s.currentTrack?.id || null,
+      position: audioEl?.currentTime || 0, queue: s.queue, sleepTimerEnd: s.sleepTimerEnd, crossfade: s.crossfade,
+      playbackRate: s.playbackRate, volumeBoost: s.volumeBoost,
+    };
+    void fs.saveSettingsToCloud(user, settings);
+  }, 1500);
+}
+
+function pushSyncStateSoon(get: () => PlayerState) {
+  if (seekPushTimer) clearTimeout(seekPushTimer);
+  seekPushTimer = setTimeout(() => { seekPushTimer = null; pushSyncState(get); }, 300);
 }
 
 function pushSyncState(get: () => PlayerState, force = false) {
