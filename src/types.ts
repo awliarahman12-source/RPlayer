@@ -41,6 +41,7 @@ export interface Track {
   genre?: string;
   notes?: string;
   isExternal?: boolean;
+  lyrics?: string; // <-- Tambahan untuk Lirik
 }
 
 export interface Playlist {

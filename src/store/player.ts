@@ -297,7 +297,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     audioEl.addEventListener('loadedmetadata', get()._onLoadedMetadata);
     audioEl.addEventListener('ended', get()._onEnded);
     audioEl.addEventListener('error', get()._onError);
-    audioEl.addEventListener('play', () => { set({ isBuffering: true }); updateMediaSession(get); });
+    audioEl.addEventListener('play', () => { set({ isPlaying: true, isBuffering: false }); updateMediaSession(get); });
     audioEl.addEventListener('pause', () => { set({ isPlaying: false, isBuffering: false }); updateMediaSession(get); });
     persist(get);
   },

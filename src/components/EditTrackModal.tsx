@@ -4,6 +4,7 @@ import { useToast } from '@/store/toast';
 import type { Track } from '@/types';
 import { Image as ImageIcon } from 'lucide-react';
 import { Cover } from './Cover';
+import { createPortal } from 'react-dom'; // <-- Tambahin ini
 
 export function EditTrackModal({ track, onClose }: { track: Track; onClose: () => void }) {
   const editTrack = useLibrary((s) => s.editTrack);
@@ -16,38 +17,28 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validasi ukuran maksimal 2MB biar Firestore nggak error
     if (file.size > 2 * 1024 * 1024) {
       pushToast('Ukuran gambar maksimal 2MB', 'error');
       return;
     }
-
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setCover(event.target?.result as string);
-    };
+    reader.onload = (event) => { setCover(event.target?.result as string); };
     reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await editTrack(track.id, { 
-      title, 
-      artist, 
-      album: album || undefined,
-      coverDataUrl: cover || undefined
-    });
+    await editTrack(track.id, { title, artist, album: album || undefined, coverDataUrl: cover || undefined });
     pushToast('Metadata lagu diperbarui');
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+  // Pakai createPortal biar nggak kerender di dalam parent yang aneh
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
       <form onSubmit={handleSubmit} className="glass-strong rounded-3xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto scroll-hidden">
         <h2 className="text-xl font-bold text-white text-center">Edit Info Lagu</h2>
         
-        {/* Bagian Upload Cover */}
         <div className="flex flex-col items-center gap-3 mb-2">
           <div className="relative group cursor-pointer">
             <Cover src={cover} alt={title} className="w-28 h-28 rounded-2xl shadow-lg" rounded="lg" />
@@ -77,6 +68,7 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
           <button type="submit" className="flex-1 bg-accent text-black font-semibold rounded-full py-2 text-sm tap">Simpan</button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }

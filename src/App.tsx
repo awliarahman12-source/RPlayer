@@ -62,7 +62,8 @@ export default function App() {
   const load = useLibrary((s) => s.load);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [nowOpen, setNowOpen] = useState(false);
-  const [fullscreenOpen, setFullscreenOpen] = useState(false); // <-- State Fullscreen
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [desktopLyricsOpen, setDesktopLyricsOpen] = useState(false); // <-- State Fullscreen
   const { user, loading: authLoading } = useAuth();
   const hash = useHash();
 
@@ -162,7 +163,7 @@ export default function App() {
                 <AnimatedRoutes />
               </div>
               <div className="hidden lg:block w-[340px] shrink-0 p-3 pl-0 h-full">
-                <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" />
+                <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="desktop" showLyrics={desktopLyricsOpen} />
               </div>
             </main>
           </div>
@@ -174,7 +175,11 @@ export default function App() {
 
           {/* TAMBAHAN: Props onFullscreen ke PlayerBar */}
           <div className="hidden lg:block">
-            <PlayerBar onExpand={() => setNowOpen(true)} onFullscreen={() => setFullscreenOpen(true)} />
+            <PlayerBar 
+              onExpand={() => setNowOpen(true)} 
+              onFullscreen={() => setFullscreenOpen(true)} 
+              onShowLyrics={() => setDesktopLyricsOpen(!desktopLyricsOpen)} 
+            />
           </div>
           
           <NowPlaying open={nowOpen} onClose={() => setNowOpen(false)} variant="mobile" />

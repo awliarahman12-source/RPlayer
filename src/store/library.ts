@@ -15,6 +15,7 @@ interface LibraryState {
   addFiles: (files: File[]) => Promise<void>;
   removeTrack: (id: string) => Promise<void>;
   editTrack: (id: string, patch: Partial<Track>) => Promise<void>;
+  updateLyrics: (id: string, lyrics: string) => Promise<void>;
   toggleLike: (id: string) => Promise<void>;
   createPlaylist: (name: string) => Promise<Playlist>;
   renamePlaylist: (id: string, name: string) => Promise<void>;
@@ -29,37 +30,6 @@ interface LibraryState {
   recentlyPlayed: () => Track[];
   importExternalTrack: (track: Track) => Promise<void>;
   downloadTrack: (id: string) => Promise<void>;
-}
-
-async function deleteRemoteFile(audioUrl: string) {
-  try {
-    await fetch('/api/delete-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audioUrl }),
-    });
-  } catch (e) {
-    console.warn('Gagal hapus file di R2 (diabaikan):', e);
-  }
-}
-
-async function shrinkDataUrl(dataUrl: string, maxSize = 512, maxChars = 400_000): Promise<string> {
-  if (dataUrl.length <= maxChars) return dataUrl;
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      const ctx = c.getContext('2d');
-      if (!ctx) return resolve(dataUrl);
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      resolve(c.toDataURL('image/jpeg', 0.8));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
 }
 
 export const useLibrary = create<LibraryState>((set, get) => ({
@@ -80,13 +50,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         fs.getTracksFromCloud(user),
         fs.getPlaylistsFromCloud(user)
       ]);
-      // isDownloaded dihitung dari IndexedDB perangkat ini, bukan dari cloud
-      const withLocal = await Promise.all(
-        tracks.map(async (t) => ({ ...t, isDownloaded: await db.hasAudioBlob(t.id) }))
-      );
-      set({ tracks: withLocal, playlists, loading: false });
-    } catch (error) {
-      console.error("Gagal narik data dari Firestore (cek Rules/AdBlocker):", error);
+      set({ tracks, playlists, loading: false });
+    } catch (error: any) {
+      console.error("Gagal narik data:", error);
+      // MUNCULIN NOTIFIKASI MERAH DI LAYAR
+      import('./notification').then((mod) => {
+        mod.useNotification.getState().show(`Gagal load: ${error.message || 'Koneksi diblokir'}`, 'error');
+      });
       set({ loading: false });
     }
   },
@@ -105,7 +75,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     try {
       const newTracks: Track[] = [];
       for (const file of valid) {
-        let uploadedUrl: string | null = null;
         try {
           notify.startUpload(file.name);
           
@@ -139,7 +108,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
             xhr.send(file);
           });
 
-          uploadedUrl = publicUrl;
           track.audioUrl = publicUrl;
           
           await fs.saveTrackToCloud(user, track);
@@ -149,8 +117,6 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           
         } catch (e) {
           console.error('Failed to import', file.name, e);
-          // Kalau file sudah ke-upload tapi simpan metadata gagal, bersihin file yatim di R2
-          if (uploadedUrl) void deleteRemoteFile(uploadedUrl);
           notify.endUpload(false);
         }
       }
@@ -166,34 +132,29 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   removeTrack: async (id) => {
     const user = useAuth.getState().user;
-    const track = get().tracks.find((t) => t.id === id);
-
-    // 1. Stop player kalau lagu ini lagi aktif, dan bersihin dari antrian/riwayat
-    const player = usePlayer.getState();
-    if (player.currentTrack?.id === id) player.clearCurrent();
-    usePlayer.setState((s) => ({
-      queue: s.queue.filter((q) => q !== id),
-      history: s.history.filter((h) => h !== id),
-    }));
-
-    // 2. Hapus dokumen lagu + simpan ulang playlist yang terdampak ke Firestore
-    const cleanedPlaylists = get()
-      .playlists.filter((p) => p.trackIds.includes(id))
-      .map((p) => ({ ...p, trackIds: p.trackIds.filter((t) => t !== id) }));
-    if (user) {
-      await fs.deleteTrackFromCloud(user, id);
-      await Promise.all(cleanedPlaylists.map((p) => fs.savePlaylistToCloud(user, p)));
-    }
-
-    // 3. Update state lokal
+    if (user) await fs.deleteTrackFromCloud(user, id);
+    
     set((s) => ({
       tracks: s.tracks.filter((t) => t.id !== id),
-      playlists: s.playlists.map((p) => cleanedPlaylists.find((c) => c.id === p.id) ?? p),
+      playlists: s.playlists.map((p) => ({ ...p, trackIds: p.trackIds.filter((t) => t !== id) })),
     }));
 
-    // 4. Bersihin file offline + file di R2 (best effort)
-    try { await db.deleteAudioBlob(id); } catch { /* abaikan */ }
-    if (track?.audioUrl && !track.isExternal) void deleteRemoteFile(track.audioUrl);
+    if (usePlayer.getState().currentTrack?.id === id) {
+      usePlayer.getState().togglePlay();
+      usePlayer.setState({ currentTrack: null, isPlaying: false, position: 0 });
+    }
+  },
+  
+  updateLyrics: async (id, lyrics) => {
+    const user = useAuth.getState().user;
+    const track = get().tracks.find(t => t.id === id);
+    if (!track || !user) return;
+    const updated = { ...track, lyrics };
+    await fs.saveTrackToCloud(user, updated);
+    set(s => ({ tracks: s.tracks.map(t => t.id === id ? updated : t) }));
+    if (usePlayer.getState().currentTrack?.id === id) {
+      usePlayer.setState({ currentTrack: updated });
+    }
   },
 
   editTrack: async (id, patch) => {
@@ -248,6 +209,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       await db.saveAudioBlob(track.id, blob);
       
       const updated = { ...track, isDownloaded: true };
+      await fs.saveTrackToCloud(user, updated);
       set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? updated : t)) }));
       
       useNotification.getState().show('Lagu berhasil di-download', 'success');
@@ -291,8 +253,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const user = useAuth.getState().user;
     const p = get().playlists.find((x) => x.id === id);
     if (!p || !user) return;
-    const safeCover = await shrinkDataUrl(coverDataUrl);
-    const updated = { ...p, coverDataUrl: safeCover };
+    const updated = { ...p, coverDataUrl };
     await fs.savePlaylistToCloud(user, updated);
     set((s) => ({ playlists: s.playlists.map((x) => (x.id === id ? updated : x)) }));
   },

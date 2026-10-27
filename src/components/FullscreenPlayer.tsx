@@ -159,12 +159,10 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, []);
 
-  // Keluar dari fullscreen browser kalau player ditutup
   useEffect(() => {
     if (!open && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   }, [open]);
 
-  // Kalau lagu hilang (mis. dihapus), tutup
   useEffect(() => {
     if (open && !track) onClose();
   }, [open, track, onClose]);
