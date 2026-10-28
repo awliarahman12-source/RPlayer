@@ -4,7 +4,7 @@ import { Play, Shuffle, Heart, MoreHorizontal, Pencil, Trash2, Plus, Clock, Sear
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { useToast } from '@/store/toast';
-import { useAuth } from '@/store/auth'; // <-- TAMBAHAN: Import useAuth
+import { useAuth } from '@/store/auth'; 
 import { TrackRow } from '@/components/TrackRow';
 import { Cover } from '@/components/Cover';
 import { formatDuration } from '@/lib/format';
@@ -62,7 +62,6 @@ export function PlaylistDetailPage() {
   const handlePlay = () => { if (playlistTracks.length) void playTracks(playlistTracks.map((t) => t.id)); };
   const handleShuffle = () => { if (!shuffle) toggleShuffle(); if (playlistTracks.length) void playTracks(playlistTracks.map((t) => t.id)); };
 
-  // Upload lagu dari perangkat: langsung masuk library dan playlist ini
   const handleAddFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
@@ -84,7 +83,6 @@ export function PlaylistDetailPage() {
           ) : (
             <>
               <Cover src={cover} alt={name} className="w-40 h-40 sm:w-48 sm:h-48 shadow-2xl" rounded="xl" />
-              {/* Tombol Ganti Cover Overlay */}
               <button 
                 className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity tap cursor-pointer"
                 onClick={() => setCoverOpen(true)}
@@ -177,16 +175,16 @@ export function PlaylistDetailPage() {
         }}>
           <SortableContext items={filteredTracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-0.5">
-              {filteredTracks.map((t, i) => 
-              <div key={`${t.id}-${i}`} className="cv-auto">
-                <SortableTrackRow 
-                  track={t} 
-                  index={i} 
-                  contextIds={playlistTracks.map((x) => x.id)} 
-                  isSelected={selectedIds.includes(t.id)}
-                  onSelect={(id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-                />
-              </div>
+              {filteredTracks.map((t, i) => (
+                <div key={`${t.id}-${i}`} className="cv-auto">
+                  <SortableTrackRow 
+                    track={t} 
+                    index={i} 
+                    contextIds={playlistTracks.map((x) => x.id)} 
+                    isSelected={selectedIds.includes(t.id)}
+                    onSelect={(id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                  />
+                </div>
               ))}
             </div>
           </SortableContext>
@@ -228,7 +226,6 @@ export function PlaylistDetailPage() {
         </div>
       </BottomSheet>
 
-      {/* Modal Ganti Cover */}
       {coverOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="glass-strong rounded-3xl p-6 w-full max-w-sm space-y-4">
