@@ -379,18 +379,20 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       }
     }
 
-  // Crossfade otomatis: mulai lagu berikutnya sebelum lagu ini habis supaya saling menimpa
-  const st = get();
-  if (st.crossfadeEnabled && !crossfadeTriggered && st.queue.length > 0 && st.repeat !== 'one' && st.syncMode !== 'speaker' && st.syncMode !== 'remote' && !audioEl.paused) {
-    const fadeSec = Math.max(0.6, st.crossfadeDuration || 3);
-    const dur = audioEl.duration;
-    const remaining = dur - audioEl.currentTime;
-    // Trigger sedikit lebih awal (fadeSec + 0.5 detik) agar buffer lagu baru siap sebelum lagu lama habis
-    if (isFinite(dur) && dur > fadeSec * 2 && remaining > 0.3 && remaining <= (fadeSec + 0.5)) {
-      crossfadeTriggered = true;
-      void get().next();
+    // Crossfade otomatis: mulai lagu berikutnya sebelum lagu ini habis supaya saling menimpa
+    const st = get();
+    if (st.crossfadeEnabled && !crossfadeTriggered && st.queue.length > 0 && st.repeat !== 'one' && st.syncMode !== 'speaker' && st.syncMode !== 'remote' && !audioEl.paused) {
+      const fadeSec = Math.max(0.6, st.crossfadeDuration || 3);
+      const dur = audioEl.duration;
+      const remaining = dur - audioEl.currentTime;
+      // Trigger sedikit lebih awal (fadeSec + 0.5 detik) agar buffer lagu baru siap sebelum lagu lama habis
+      if (isFinite(dur) && dur > fadeSec * 2 && remaining > 0.3 && remaining <= (fadeSec + 0.5)) {
+        crossfadeTriggered = true;
+        void get().next();
+      }
     }
-  }
+  }, // <-- PENUTUP FUNGSI _onTimeUpdate YANG SEBELUMNYA HILANG
+  
   _onLoadedMetadata: () => { if (!audioEl) return; set({ duration: audioEl.duration || 0 }); },
   _onEnded: () => void get().next(),
   _onError: () => {
