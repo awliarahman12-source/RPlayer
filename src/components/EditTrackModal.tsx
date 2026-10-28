@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useLibrary } from '@/store/library';
 import { useToast } from '@/store/toast';
 import type { Track } from '@/types';
-import { Image as ImageIcon, ArrowUpDown } from 'lucide-react';
+import { Image as ImageIcon, ArrowUpDown, Wand2 } from 'lucide-react';
 import { Cover } from './Cover';
-import { createPortal } from 'react-dom'; // <-- Tambahin ini
+import { createPortal } from 'react-dom'; 
+import { searchMusicBrainz } from '@/lib/musicbrainz';
 
 export function EditTrackModal({ track, onClose }: { track: Track; onClose: () => void }) {
   const editTrack = useLibrary((s) => s.editTrack);
@@ -13,6 +14,7 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
   const [artist, setArtist] = useState(track.artist);
   const [album, setAlbum] = useState(track.album || '');
   const [cover, setCover] = useState(track.coverDataUrl || '');
+  const [isFetching, setIsFetching] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,6 +28,27 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
     reader.readAsDataURL(file);
   };
 
+  const handleAutoFetch = async () => {
+    if (!title || !artist) return pushToast('Isi judul dan artis dulu', 'error');
+    setIsFetching(true);
+    const result = await searchMusicBrainz(title, artist);
+    if (result) {
+      if (result.album) setAlbum(result.album);
+      if (result.coverUrl) {
+        // Konversi URL gambar ke Base64 agar aman disimpan di Firestore
+        const imgRes = await fetch(result.coverUrl);
+        const blob = await imgRes.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => setCover(e.target?.result as string);
+        reader.readAsDataURL(blob);
+      }
+      pushToast('Metadata ditemukan!');
+    } else {
+      pushToast('Metadata tidak ditemukan', 'error');
+    }
+    setIsFetching(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await editTrack(track.id, { title, artist, album: album || undefined, coverDataUrl: cover || undefined });
@@ -37,7 +60,17 @@ export function EditTrackModal({ track, onClose }: { track: Track; onClose: () =
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
       <form onSubmit={handleSubmit} className="glass-strong rounded-3xl p-6 w-full max-w-sm space-y-4 max-h-[90vh] overflow-y-auto scroll-hidden">
-        <h2 className="text-xl font-bold text-white text-center">Edit Info Lagu</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold text-white">Edit Info Lagu</h2>
+          <button 
+            type="button" 
+            onClick={handleAutoFetch} 
+            disabled={isFetching}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/20 text-accent rounded-full text-xs font-semibold tap hover:bg-accent/30 disabled:opacity-50 transition-colors"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> {isFetching ? 'Mencari...' : 'Auto Cari'}
+          </button>
+        </div>
         
         <div className="flex flex-col items-center gap-3 mb-2">
           <div className="relative group cursor-pointer">

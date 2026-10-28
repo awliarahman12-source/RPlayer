@@ -93,7 +93,7 @@ function Popover({ open, onClose, anchorRef, children }: { open: boolean; onClos
             animate={{ opacity: pos ? 1 : 0, scale: pos ? 1 : 0.92, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: -4 }}
             transition={{ type: 'spring', stiffness: 520, damping: 34, mass: 0.7 }}
-            className="fixed z-[301] w-[280px] glass-strong rounded-2xl p-1.5 shadow-2xl"
+            className="fixed z-[301] w-[280px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl"
             style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, transformOrigin: pos?.origin ?? 'top right', maxHeight: 'calc(100vh - 20px)' }}
             onContextMenu={(e) => e.preventDefault()}
           >

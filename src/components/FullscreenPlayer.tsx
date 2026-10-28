@@ -365,7 +365,8 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3), ease: EASE_OUT }}
-                          className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/10"
+                          className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 cursor-pointer"
+                          onClick={() => usePlayer.getState().playTrack(t.id)}
                         >
                           <Cover src={t.coverDataUrl} alt={t.title} rounded="md" className="w-12 h-12 shrink-0" />
                           <div className="min-w-0 flex-1">
@@ -375,7 +376,7 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
                           <span className="text-xs text-white/40 tabular-nums">{formatTime(t.duration)}</span>
                           <button
                             className="tap p-1.5 text-white/50 opacity-0 group-hover:opacity-100 hover:text-white"
-                            onClick={() => removeFromQueue(i)}
+                            onClick={(e) => { e.stopPropagation(); removeFromQueue(i)}}
                             aria-label="Hapus dari antrian"
                           >
                             <X className="w-4 h-4" />

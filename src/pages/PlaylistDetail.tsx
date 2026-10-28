@@ -177,9 +177,9 @@ export function PlaylistDetailPage() {
         }}>
           <SortableContext items={filteredTracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-0.5">
-              {filteredTracks.map((t, i) => (
+              {filteredTracks.map((t, i) => 
+              <div key={`${t.id}-${i}`} className="cv-auto">
                 <SortableTrackRow 
-                  key={`${t.id}-${i}`} 
                   track={t} 
                   index={i} 
                   contextIds={playlistTracks.map((x) => x.id)} 

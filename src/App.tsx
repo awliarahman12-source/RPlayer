@@ -14,6 +14,7 @@ import { LibraryPage } from '@/pages/Library';
 import { PlaylistDetailPage } from '@/pages/PlaylistDetail';
 import { SettingsPage } from '@/pages/Settings';
 import { ExplorePage } from '@/pages/Explore';
+import { RadioPage } from '@/pages/Radio';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
 import { getSettingsFromCloud, onSyncPlaybackChange } from '@/lib/firestore';
@@ -49,6 +50,7 @@ function AnimatedRoutes() {
           <Route path="/" element={<HomePage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/radio" element={<RadioPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/playlist/:id" element={<PlaylistDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />

@@ -64,7 +64,8 @@ export function LibraryPage() {
           ) : (
             <div className="space-y-0.5">
               {sortedTracks.map((t, i) => (
-                <TrackRow key={t.id} track={t} index={i} contextIds={sortedTracks.map((x) => x.id)} showAlbum />
+                <div key={t.id} className+"cv-auto">
+                  <TrackRow track={t} index={i} contextIds={sortedTracks.map((x) => x.id)} showAlbum />
               ))}
             </div>
           )}

@@ -82,7 +82,7 @@ export function PlayerBar({ onExpand, onFullscreen, onShowLyrics }: PlayerBarPro
 
               {/* Popover Menu */}
               {menuOpen && (
-                <div className="absolute bottom-14 right-0 glass-strong rounded-2xl p-2 w-48 shadow-2xl animate-spring-up">
+                <div className="absolute bottom-14 right-0 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-2 w-48 shadow-2xl animate-spring-up z-[90]">
                   {!syncSubMenu ? (
                     <div className="space-y-1">
                       <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-white/10 rounded-xl tap" onClick={() => { setMenuOpen(false); setLyricsOpen(true); }}>

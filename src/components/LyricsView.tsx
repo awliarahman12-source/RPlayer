@@ -1,7 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, type WheelEvent } from 'react';
 import { useLibrary } from '@/store/library';
 import { usePlayer } from '@/store/player';
-import { Pencil } from 'lucide-react';
+import { Pencil, Sparkles } from 'lucide-react';
+import { fetchLyricsFromLRCLIB } from '@/lib/lyrics';
 
 interface LyricLine {
   time: number;
@@ -65,6 +66,7 @@ export function LyricsView({ trackId, variant = 'sheet', hideEditButton = false 
   const [raw, setRaw] = useState('');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [isFetching, setIsFetching] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -151,6 +153,19 @@ export function LyricsView({ trackId, variant = 'sheet', hideEditButton = false 
     setEditing(false);
   };
 
+  const autoFetchLyrics = async () => {
+    if (!track) return;
+    setIsFetching(true);
+    const lyrics = await fetchLyricsFromLRCLIB(track.title, track.artist, track.duration);
+    if (lyrics) {
+      void updateLyrics(trackId, lyrics);
+      setRaw(lyrics);
+    } else {
+      alert('Lirik tidak ditemukan di database LRCLIB.');
+    }
+    setIsFetching(false);
+  };
+
   if (editing) {
     return (
       <div className={`flex flex-col gap-3 p-4 ${full ? 'h-full justify-center' : desktopPanel ? 'h-full justify-center' : 'h-[60vh] justify-center'}`}>
@@ -172,9 +187,14 @@ export function LyricsView({ trackId, variant = 'sheet', hideEditButton = false 
       <div className={`flex flex-col items-center justify-center text-center gap-4 ${full || desktopPanel ? 'h-full' : 'p-4 h-[60vh]'}`}>
         <p className={full || desktopPanel ? 'text-lg font-bold text-white/40' : 'text-white/50'}>Belum ada lirik</p>
         {!hideEditButton && (
-          <button className="tap px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-xs font-medium flex items-center gap-2" onClick={startEdit}>
-            <Pencil className="w-3 h-3" /> Tambah lirik
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="tap px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-xs font-medium flex items-center gap-2" onClick={startEdit}>
+              <Pencil className="w-3 h-3" /> Tambah
+            </button>
+            <button disabled={isFetching} className="tap px-4 py-2 rounded-full bg-accent/20 text-accent hover:bg-accent/30 text-xs font-medium flex items-center gap-2 disabled:opacity-50" onClick={autoFetchLyrics}>
+              <Sparkles className="w-3 h-3" /> {isFetching ? 'Mencari...' : 'Cari Lirik'}
+            </button>
+          </div>
         )}
       </div>
     );

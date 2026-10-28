@@ -40,6 +40,7 @@ interface PlayerState {
   setPlaybackRate: (rate: number) => void;
   setVolumeBoost: (boost: number) => void;
   setSyncMode: (mode: SyncMode, options?: { silent?: boolean }) => void;
+  playRadio: (track: Track) => Promise<void>;
   playTrack: (trackId: string, contextIds?: string[]) => Promise<void>;
   playTracks: (trackIds: string[], startIndex?: number) => Promise<void>;
   togglePlay: () => void;
@@ -156,6 +157,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
     set({ hostId: mode === 'host' ? deviceId : get().hostId });
     void usePresence.getState().updateMyRole(mode);
+  },
+
+  playRadio: async (track) => {
+    if (get().syncMode === 'speaker') return;
+    set({ queue: [], history: [] }); // Radio nggak punya antrean
+    await loadAndPlay(track, set, get);
   },
 
   playTrack: async (trackId, contextIds) => {
@@ -332,6 +339,24 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   _onTimeUpdate: () => {
     if (!audioEl) return;
     set({ position: audioEl.currentTime });
+
+    // Smart Sleep Timer (Fade out 10 detik terakhir)
+    const s = get();
+    if (s.sleepTimerEnd) {
+      const remaining = s.sleepTimerEnd - Date.now();
+      if (remaining > 0 && remaining <= 10000) {
+        // Menurunkan volume secara perlahan (0 s/d 1)
+        const fadeRatio = remaining / 10000;
+        audioEl.volume = Math.max(0, Math.min(1, s.volume * s.volumeBoost * fadeMul * fadeRatio));
+      } else if (remaining <= 0) {
+        // Waktu habis, matikan lagu
+        if (audioEl && !audioEl.paused) {
+          audioEl.pause();
+          set({ isPlaying: false, sleepTimerEnd: null });
+          import('./notification').then((mod) => mod.useNotification.getState().show('Sleep Timer selesai, selamat tidur!', 'info'));
+        }
+      }
+    }
     // Throttle: maksimal sekali tiap 5 detik (timeupdate jalan ~4x/detik)
     const now = Date.now();
     if (now - lastTick >= 5000) {
@@ -354,18 +379,18 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       }
     }
 
-    // Crossfade otomatis: mulai lagu berikutnya sebelum lagu ini habis supaya saling menimpa
-    const st = get();
-    if (st.crossfadeEnabled && !crossfadeTriggered && st.queue.length > 0 && st.repeat !== 'one' && st.syncMode !== 'speaker' && st.syncMode !== 'remote' && !audioEl.paused) {
-      const fadeSec = Math.max(0.6, st.crossfadeDuration || 3);
-      const dur = audioEl.duration;
-      const remaining = dur - audioEl.currentTime;
-      if (isFinite(dur) && dur > fadeSec * 2 && remaining > 0.3 && remaining <= fadeSec) {
-        crossfadeTriggered = true;
-        void get().next();
-      }
+  // Crossfade otomatis: mulai lagu berikutnya sebelum lagu ini habis supaya saling menimpa
+  const st = get();
+  if (st.crossfadeEnabled && !crossfadeTriggered && st.queue.length > 0 && st.repeat !== 'one' && st.syncMode !== 'speaker' && st.syncMode !== 'remote' && !audioEl.paused) {
+    const fadeSec = Math.max(0.6, st.crossfadeDuration || 3);
+    const dur = audioEl.duration;
+    const remaining = dur - audioEl.currentTime;
+    // Trigger sedikit lebih awal (fadeSec + 0.5 detik) agar buffer lagu baru siap sebelum lagu lama habis
+    if (isFinite(dur) && dur > fadeSec * 2 && remaining > 0.3 && remaining <= (fadeSec + 0.5)) {
+      crossfadeTriggered = true;
+      void get().next();
     }
-  },
+  }
   _onLoadedMetadata: () => { if (!audioEl) return; set({ duration: audioEl.duration || 0 }); },
   _onEnded: () => void get().next(),
   _onError: () => {

@@ -125,28 +125,66 @@ export const useLibrary = create<LibraryState>((set, get) => ({
           if (!res.ok) throw new Error('Gagal konek ke API Vercel');
           const { uploadUrl, publicUrl } = await res.json();
 
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', file.type || 'audio/mpeg');
-            
-            xhr.upload.onprogress = (event) => {
-              if (event.lengthComputable) {
-                notify.updateProgress((event.loaded / event.total) * 100);
-              }
-            };
-            
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) resolve();
-              else reject(new Error('Upload ke R2 gagal'));
-            };
-            xhr.onerror = () => reject(new Error('Network error saat upload'));
-            xhr.send(file);
-          });
+          // Fungsi upload dengan fitur Retry (Coba ulang) otomatis
+          const uploadWithRetry = (url: string, fileToUpload: File, mimeType: string, retries = 3): Promise<void> => {
+            return new Promise((resolve, reject) => {
+              const attempt = (attemptsLeft: number) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', url, true);
+                xhr.setRequestHeader('Content-Type', mimeType);
+                
+                xhr.upload.onprogress = (event) => {
+                  if (event.lengthComputable) {
+                    notify.updateProgress((event.loaded / event.total) * 100);
+                  }
+                };
+                
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) resolve();
+                  else if (attemptsLeft > 0) attempt(attemptsLeft - 1);
+                  else reject(new Error('Upload ke R2 gagal'));
+                };
+                xhr.onerror = () => {
+                  if (attemptsLeft > 0) attempt(attemptsLeft - 1);
+                  else reject(new Error('Network error saat upload'));
+                };
+                xhr.send(fileToUpload);
+              };
+              attempt(retries);
+            });
+          };
+
+          await uploadWithRetry(uploadUrl, file, file.type || 'audio/mpeg');
 
           uploadedUrl = publicUrl;
           track.audioUrl = publicUrl;
-          
+
+          // === TASK 3.2: Upload cover Base64 ke R2 ===
+          if (track.coverDataUrl && track.coverDataUrl.startsWith('data:image')) {
+            try {
+              const coverBlob = await (await fetch(track.coverDataUrl)).blob();
+              const coverRes = await fetch('/api/generate-upload-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: `${track.id}-cover.jpg`, contentType: 'image/jpeg' })
+              });
+              if (coverRes.ok) {
+                const { uploadUrl: coverUploadUrl, publicUrl: coverPublicUrl } = await coverRes.json();
+                // Upload file gambar
+                await fetch(coverUploadUrl, {
+                  method: 'PUT',
+                  body: coverBlob,
+                  headers: { 'Content-Type': 'image/jpeg' }
+                });
+                // Ganti string Base64 panjang dengan URL R2 yang ringan
+                track.coverDataUrl = coverPublicUrl; 
+              }
+            } catch (coverErr) {
+              console.warn("Gagal upload cover ke R2, cover tetap pakai Base64:", coverErr);
+            }
+          }
+          // ==========================================
+
           await fs.saveTrackToCloud(user, track);
           newTracks.push(track);
           

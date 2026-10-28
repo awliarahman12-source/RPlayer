@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Search, Library, Compass } from 'lucide-react';
+import { Home, Search, Library, Compass, Radio } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 const tabs = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/explore', label: 'Explore', icon: Compass },
+  { to: '/radio', label: 'Radio', icon: Radio },
   { to: '/library', label: 'Library', icon: Library },
 ];
 

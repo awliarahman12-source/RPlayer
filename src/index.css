@@ -370,3 +370,9 @@ input[type='checkbox'] {
 input[type='checkbox']:active {
   transform: scale(0.88);
 }
+
+/* Optimasi Performa List Panjang */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 56px; /* Estimasi tinggi 1 baris lagu */
+}
