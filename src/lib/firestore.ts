@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Track, Playlist, SyncPlaybackState } from '@/types';
 
@@ -64,4 +64,13 @@ export function onSyncPlaybackChange(username: string, callback: (state: SyncPla
       callback(docSnap.data() as SyncPlaybackState);
     }
   });
+}
+
+/** Heartbeat host: cuma update posisi + waktu (merge), tidak menimpa perintah dari remote yang mungkin lagi di jalan. */
+export async function heartbeatSyncPlayback(username: string, deviceId: string, position: number, updatedAt: number) {
+  try {
+    await updateDoc(doc(db, 'users', username, 'sync', 'playback'), { position, updatedAt, hbBy: deviceId });
+  } catch {
+    // dokumen belum ada / offline: abaikan
+  }
 }

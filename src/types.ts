@@ -19,6 +19,7 @@ export interface SyncPlaybackState {
   repeat?: 'off' | 'all' | 'one';
   shuffle?: boolean;
   queue?: string[];
+  hbBy?: string; // diisi heartbeat host supaya host tidak memproses gema heartbeat-nya sendiri
 }
 
 export interface Track {

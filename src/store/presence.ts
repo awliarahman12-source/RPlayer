@@ -5,6 +5,7 @@ import type { ActiveDevice, SyncMode } from '@/types';
 import { useAuth } from './auth';
 import { usePlayer } from './player';
 import { useNotification } from './notification';
+import { syncClock } from '@/lib/clock';
 
 interface PresenceState {
   devices: ActiveDevice[];
@@ -32,7 +33,7 @@ export const usePresence = create<PresenceState>((set, get) => ({
         const now = Date.now();
         const activeDevices = snap.docs
           .map(d => d.data() as ActiveDevice)
-          .filter(d => now - d.lastActive < 60000 || d.deviceId === myDeviceId);
+          .filter(d => now - d.lastActive < 120000 || d.deviceId === myDeviceId);
 
         activeDevices.sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 
@@ -58,8 +59,8 @@ export const usePresence = create<PresenceState>((set, get) => ({
           joinedAt: Date.now(),
         });
 
-        usePlayer.getState().setSyncMode(myRole);
-        if (myRole === 'remote') usePlayer.getState()._forceSyncWithHost();
+        // silent: perangkat baru TIDAK menulis state-nya ke cloud (dulu ini yang bikin perangkat lain ke-pause)
+        usePlayer.getState().setSyncMode(myRole, { silent: true });
       } catch (err) {
         console.error("Gagal inisialisasi presence", err);
       }
@@ -67,16 +68,27 @@ export const usePresence = create<PresenceState>((set, get) => ({
 
     void initDevice();
 
-    const interval = setInterval(() => {
-      void setDoc(deviceRef, { lastActive: Date.now() }, { merge: true });
-    }, 15000);
+    const ping = () => { void setDoc(deviceRef, { lastActive: Date.now() }, { merge: true }); };
+    const interval = setInterval(ping, 20000);
+    const onVisible = () => { if (!document.hidden) ping(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    // Samakan jam dengan server, lalu sinkron ulang kalau perangkat ini pengikut (posisi jadi presisi)
+    const resync = () => {
+      void syncClock(user, myDeviceId).then(() => {
+        const mode = usePlayer.getState().syncMode;
+        if (mode === 'speaker' || mode === 'remote') void usePlayer.getState()._forceSyncWithHost();
+      });
+    };
+    resync();
+    const clockInterval = setInterval(() => void syncClock(user, myDeviceId), 5 * 60 * 1000);
 
     // Listener buat mantau device lain & auto-promote
     const unsub = onSnapshot(collection(db, 'users', user, 'active_devices'), (snap) => {
       const now = Date.now();
       const active = snap.docs
         .map(d => d.data() as ActiveDevice)
-        .filter(d => now - d.lastActive < 60000);
+        .filter(d => now - d.lastActive < 120000);
       
       const myDbDevice = active.find(d => d.deviceId === myDeviceId);
 
@@ -93,15 +105,14 @@ export const usePresence = create<PresenceState>((set, get) => ({
           const candidate = remote || oldestSpeaker;
           if (candidate && candidate.deviceId === myDeviceId) {
             void updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'host' });
-            usePlayer.getState().setSyncMode('host');
+            usePlayer.getState().setSyncMode('host', { silent: true });
           }
         } else if (!hasRemote && active.length > 1) {
           // Remote mati, cari Speaker tertua buat naik
           const oldestSpeaker = [...active].filter(d => d.role === 'speaker').sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))[0];
           if (oldestSpeaker && oldestSpeaker.deviceId === myDeviceId) {
             void updateDoc(doc(db, 'users', user, 'active_devices', myDeviceId), { role: 'remote' });
-            usePlayer.getState().setSyncMode('remote');
-            usePlayer.getState()._forceSyncWithHost();
+            usePlayer.getState().setSyncMode('remote', { silent: true });
           }
         }
 
@@ -116,6 +127,8 @@ export const usePresence = create<PresenceState>((set, get) => ({
 
     return () => {
       clearInterval(interval);
+      clearInterval(clockInterval);
+      document.removeEventListener('visibilitychange', onVisible);
       unsub();
     };
   },
