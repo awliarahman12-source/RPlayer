@@ -186,6 +186,7 @@ export function PlaylistDetailPage() {
                   isSelected={selectedIds.includes(t.id)}
                   onSelect={(id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                 />
+              </div>
               ))}
             </div>
           </SortableContext>
