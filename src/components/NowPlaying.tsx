@@ -100,23 +100,23 @@ export function NowPlaying({ open, onClose, variant = 'mobile', showLyrics = fal
   if (variant === 'desktop') {
     return (
       <aside className="hidden lg:flex flex-col gap-4 p-4 h-full">
-        <div className="glass rounded-glass p-4 flex flex-col items-center relative overflow-hidden h-full">
-          {/* Bagian Atas: Cover & Info */}
-          <div className="w-full flex flex-col items-center shrink-0 relative z-10 pb-4 border-b border-white/10">
+        <div className="glass rounded-glass p-4 flex flex-col items-center relative overflow-hidden">
+          {/* Urutan: cover, durasi, informasi, lirik */}
+          <div className="w-full flex flex-col items-center shrink-0 relative z-10 pb-3 border-b border-white/10">
             <Visualizer />
             <div className={`relative transition-transform duration-700 ${isPlaying ? 'scale-105' : 'scale-100'}`}>
-              <Cover src={track.coverDataUrl} alt={track.title} className="w-full aspect-square max-w-[200px] mb-4 shadow-2xl" rounded="xl" />
+              <Cover src={track.coverDataUrl} alt={track.title} className="w-full aspect-square max-w-[200px] mb-3 shadow-2xl" rounded="xl" />
               <div className="absolute inset-0 bg-accent/30 blur-3xl -z-10 rounded-full animate-pulse" />
             </div>
-            <h2 className="text-lg font-bold truncate w-full text-center">{track.title}</h2>
-            <p className="text-white/60 truncate w-full text-sm mt-0.5 text-center">{track.artist}</p>
-            <div className="w-full mt-3">
+            <div className="w-full">
               <Slider value={position} max={duration || track.duration || 0} onChange={seek} onCommit={seek} />
             </div>
+            <h2 className="text-lg font-bold truncate w-full text-center mt-2">{track.title}</h2>
+            <p className="text-white/60 truncate w-full text-sm mt-0.5 text-center">{track.artist}</p>
           </div>
-          
-          {/* Bagian Bawah: Lirik */}
-          <div className="w-full flex-1 overflow-hidden pt-2">
+
+          {/* Lirik: tingginya dibatasi, nggak memanjang sampai bawah layar */}
+          <div className="w-full pt-2" style={{ height: 'clamp(190px, 28vh, 300px)' }}>
             <LyricsView trackId={track.id} variant="desktop-panel" hideEditButton={true} />
           </div>
         </div>
@@ -167,7 +167,11 @@ export function NowPlaying({ open, onClose, variant = 'mobile', showLyrics = fal
 
   // --- FULLSCREEN VERSION ---
   if (variant === 'fullscreen') {
-    return <FullscreenPlayer open={open} onClose={onClose} />;
+    return (
+      <AnimatePresence>
+        {open && <FullscreenPlayer key="fullscreen" open onClose={onClose} />}
+      </AnimatePresence>
+    );
   }
 
   // --- MOBILE VERSION ---

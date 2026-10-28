@@ -125,6 +125,23 @@ function TopButton({ active, onClick, label, children }: { active?: boolean; onC
   );
 }
 
+function useViewport() {
+  const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setVp({ w: window.innerWidth, h: window.innerHeight }));
+    };
+    window.addEventListener('resize', onResize);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); };
+  }, []);
+  return vp;
+}
+
+const SPRING = { type: 'spring', stiffness: 130, damping: 24, mass: 0.9 } as const;
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
 export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const track = usePlayer((s) => s.currentTrack);
   const isPlaying = usePlayer((s) => s.isPlaying);
@@ -148,6 +165,7 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
 
   const [panel, setPanel] = useState<Panel>('lyrics');
   const [browserFs, setBrowserFs] = useState(false);
+  const vp = useViewport();
 
   useEffect(() => {
     if (!open) return;
@@ -165,6 +183,11 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
   useEffect(() => {
     if (!open && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   }, [open]);
+
+  // Karena komponen ini di-unmount lewat animasi keluar, keluar dari fullscreen browser dilakukan saat unmount
+  useEffect(() => () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (open && !track) onClose();
@@ -186,12 +209,19 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
   const VolIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const maxDur = duration || track.duration || 0;
 
+  const panelOpen = panel !== 'none';
+  const coverW = Math.round(Math.min(vp.h * 0.46, vp.w * 0.34));
+  const panelW = Math.round(Math.min(vp.w * 0.36, 540));
+  const panelH = Math.round(vp.h * 0.78);
+  const gap = Math.round(vp.w * 0.06);
+
   return (
     <motion.div
       className="fixed inset-0 z-[200] overflow-hidden bg-black text-white select-none"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
+      initial={{ opacity: 0, scale: 1.03 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 1.03 }}
+      transition={{ duration: 0.45, ease: EASE_OUT }}
     >
       <Backdrop cover={track.coverDataUrl} />
 
@@ -208,19 +238,23 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
       </div>
 
       {/* Konten utama */}
-      <div className="relative z-10 h-full flex items-center justify-center gap-[6vw] px-[5vw]">
-        {/* Kiri: cover + kontrol */}
-        <div className="shrink-0 flex flex-col" style={{ width: 'min(46vh, 36vw)' }}>
-          <motion.div
-            animate={{ scale: isPlaying ? 1 : 0.88 }}
-            transition={{ type: 'spring', stiffness: 160, damping: 20 }}
-          >
-            <Cover
-              src={track.coverDataUrl}
-              alt={track.title}
-              rounded="lg"
-              className="w-full aspect-square shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
-            />
+      <div className="relative z-10 h-full flex items-center justify-center px-[3vw]">
+        {/* Kiri: cover, info, durasi, kontrol */}
+        <motion.div className="shrink-0 flex flex-col" initial={false} animate={{ width: coverW }} transition={SPRING}>
+          <motion.div animate={{ scale: isPlaying ? 1 : 0.88 }} transition={{ type: 'spring', stiffness: 160, damping: 20 }}>
+            <motion.div
+              key={track.id}
+              initial={{ opacity: 0.35, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, ease: EASE_OUT }}
+            >
+              <Cover
+                src={track.coverDataUrl}
+                alt={track.title}
+                rounded="lg"
+                className="w-full aspect-square shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+              />
+            </motion.div>
           </motion.div>
 
           <div className="mt-8 flex items-center gap-3">
@@ -283,48 +317,78 @@ export function FullscreenPlayer({ open, onClose }: { open: boolean; onClose: ()
               aria-label="Volume"
             />
           </div>
-        </div>
+        </motion.div>
 
-        {/* Kanan: lirik / antrian */}
-        {panel === 'lyrics' && (
-          <div className="flex-1 min-w-0 max-w-[780px] h-[80vh]">
-            <LyricsView trackId={track.id} variant="full" />
-          </div>
-        )}
-
-        {panel === 'queue' && (
-          <div className="flex-1 min-w-0 max-w-[620px] h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4 px-2">
-              <h2 className="text-2xl font-bold">Berikutnya</h2>
-              {queueTracks.length > 0 && (
-                <button className="tap text-sm text-white/60 hover:text-white" onClick={clearQueue}>Bersihkan</button>
+        {/* Kanan: lirik / antrian (lebar dianimasikan, isi digeser halus saat ganti panel) */}
+        <motion.div
+          className="shrink-0 overflow-hidden"
+          initial={false}
+          animate={{ width: panelOpen ? panelW : 0, marginLeft: panelOpen ? gap : 0, opacity: panelOpen ? 1 : 0, height: panelH }}
+          transition={SPRING}
+        >
+          <div style={{ width: panelW, height: panelH }}>
+            <AnimatePresence mode="wait" initial={false}>
+              {panel === 'lyrics' && (
+                <motion.div
+                  key="lyrics"
+                  className="h-full"
+                  initial={{ opacity: 0, x: 36 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -24 }}
+                  transition={{ duration: 0.34, ease: EASE_OUT }}
+                >
+                  <LyricsView trackId={track.id} variant="full" />
+                </motion.div>
               )}
-            </div>
-            <div className="flex-1 overflow-y-auto scroll-hidden space-y-1">
-              {queueTracks.length === 0 ? (
-                <p className="text-white/40 text-center py-16">Antrian kosong</p>
-              ) : (
-                queueTracks.map((t, i) => (
-                  <div key={`${t.id}-${i}`} className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/10">
-                    <Cover src={t.coverDataUrl} alt={t.title} rounded="md" className="w-12 h-12 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{t.title}</div>
-                      <div className="truncate text-sm text-white/50">{t.artist}</div>
-                    </div>
-                    <span className="text-xs text-white/40 tabular-nums">{formatTime(t.duration)}</span>
-                    <button
-                      className="tap p-1.5 text-white/50 opacity-0 group-hover:opacity-100 hover:text-white"
-                      onClick={() => removeFromQueue(i)}
-                      aria-label="Hapus dari antrian"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {panel === 'queue' && (
+                <motion.div
+                  key="queue"
+                  className="h-full flex flex-col"
+                  initial={{ opacity: 0, x: 36 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -24 }}
+                  transition={{ duration: 0.34, ease: EASE_OUT }}
+                >
+                  <div className="flex items-center justify-between mb-4 px-2">
+                    <h2 className="text-2xl font-bold">Berikutnya</h2>
+                    {queueTracks.length > 0 && (
+                      <button className="tap text-sm text-white/60 hover:text-white" onClick={clearQueue}>Bersihkan</button>
+                    )}
                   </div>
-                ))
+                  <div className="flex-1 overflow-y-auto scroll-hidden space-y-1">
+                    {queueTracks.length === 0 ? (
+                      <p className="text-white/40 text-center py-16">Antrian kosong</p>
+                    ) : (
+                      queueTracks.map((t, i) => (
+                        <motion.div
+                          key={`${t.id}-${i}`}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3), ease: EASE_OUT }}
+                          className="group flex items-center gap-3 p-2 rounded-xl hover:bg-white/10"
+                        >
+                          <Cover src={t.coverDataUrl} alt={t.title} rounded="md" className="w-12 h-12 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium">{t.title}</div>
+                            <div className="truncate text-sm text-white/50">{t.artist}</div>
+                          </div>
+                          <span className="text-xs text-white/40 tabular-nums">{formatTime(t.duration)}</span>
+                          <button
+                            className="tap p-1.5 text-white/50 opacity-0 group-hover:opacity-100 hover:text-white"
+                            onClick={() => removeFromQueue(i)}
+                            aria-label="Hapus dari antrian"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </div>
-        )}
+        </motion.div>
       </div>
     </motion.div>
   );

@@ -185,7 +185,7 @@ export function LyricsView({ trackId, variant = 'sheet', hideEditButton = false 
     : undefined;
 
   const lineSize = full
-    ? 'origin-left py-3 pr-8 font-bold leading-tight text-[clamp(1.6rem,3.4vh,2.6rem)] text-left'
+    ? 'origin-left py-3 pr-8 font-bold leading-tight text-[clamp(1.35rem,2.9vh,2.1rem)] text-left'
     : desktopPanel
       ? 'origin-center py-2 px-1 font-semibold leading-snug text-base text-center'
       : 'origin-center py-3 text-lg font-medium text-center';
